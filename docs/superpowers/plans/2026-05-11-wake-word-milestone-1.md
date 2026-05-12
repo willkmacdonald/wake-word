@@ -475,6 +475,7 @@ git commit -m "chore: scaffold wake-word project"
 - Create: `endpoint/tests/test_protocol.py`
 - Create: `gateway/src/protocol.ts`
 - Modify: `gateway/test/protocol.test.ts`
+- Modify: `pyproject.toml`
 
 - [ ] **Step 1: Write failing Python protocol tests**
 
@@ -657,6 +658,15 @@ def parse_server_message(raw: str) -> ServerMessage:
         reason=payload.get("reason"),
         message=payload.get("message"),
     )
+```
+
+Update `[tool.pytest.ini_options]` in `pyproject.toml` so pytest can import source-layout packages even when the editable install was created before package directories existed:
+
+```toml
+[tool.pytest.ini_options]
+testpaths = ["endpoint/tests", "eval/tests"]
+asyncio_mode = "auto"
+pythonpath = ["endpoint/src", "eval/src"]
 ```
 
 - [ ] **Step 4: Write gateway protocol tests**
