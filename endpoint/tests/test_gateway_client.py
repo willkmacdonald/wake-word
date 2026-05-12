@@ -37,6 +37,18 @@ def test_retry_policy_rejects_invalid_attempt_count():
         GatewayRetryPolicy(max_attempts=0)
 
 
+def test_retry_policy_keeps_jittered_delay_within_maximum(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("wake_word_endpoint.gateway_client.random.uniform", lambda low, high: high)
+    policy = GatewayRetryPolicy(
+        max_attempts=4,
+        base_delay_seconds=1.0,
+        max_delay_seconds=2.0,
+        jitter_ratio=0.5,
+    )
+
+    assert policy.delay_for_attempt(4) == 2.0
+
+
 def test_gateway_connection_error_names_endpoint_and_attempts():
     error = GatewayConnectionError(endpoint_id="mac-studio-01", attempts=3, reason="refused")
 
@@ -51,11 +63,14 @@ class FakeWebSocket:
         self.sent: list[str | bytes] = []
         self.recv_count = 0
         self.close_count = 0
+        self.fail_after_recv_count: int | None = None
 
     async def send(self, data: str | bytes) -> None:
         self.sent.append(data)
 
     async def recv(self) -> str:
+        if self.fail_after_recv_count is not None and self.recv_count >= self.fail_after_recv_count:
+            raise OSError("recv failed")
         if self.recv_count == 0:
             assert len(self.sent) == 1
             assert isinstance(self.sent[0], str)
@@ -230,6 +245,51 @@ async def test_stream_session_retries_initial_connection_failure(monkeypatch: py
 
 
 @pytest.mark.asyncio
+async def test_stream_session_closes_socket_when_accept_recv_fails(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    websocket = FakeWebSocket([])
+    websocket.fail_after_recv_count = 0
+
+    monkeypatch.setattr(
+        "wake_word_endpoint.gateway_client.websockets.connect",
+        lambda *args, **kwargs: FakeConnect(websocket),
+    )
+
+    with pytest.raises(GatewayConnectionError, match="recv failed"):
+        await GatewayClient(
+            url="wss://gateway.example.test/sessions",
+            endpoint_id="mac-studio-01",
+            token="dev-token",
+            retry_policy=GatewayRetryPolicy(max_attempts=1),
+        ).stream_session(hello(), audio_frames())
+
+    assert websocket.close_count == 1
+
+
+@pytest.mark.asyncio
+async def test_stream_session_closes_socket_for_malformed_accept_message(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    websocket = FakeWebSocket(["not-json"])
+
+    monkeypatch.setattr(
+        "wake_word_endpoint.gateway_client.websockets.connect",
+        lambda *args, **kwargs: FakeConnect(websocket),
+    )
+
+    with pytest.raises(RuntimeError, match="gateway accepted response is invalid"):
+        await GatewayClient(
+            url="wss://gateway.example.test/sessions",
+            endpoint_id="mac-studio-01",
+            token="dev-token",
+            retry_policy=GatewayRetryPolicy(max_attempts=1),
+        ).stream_session(hello(), audio_frames())
+
+    assert websocket.close_count == 1
+
+
+@pytest.mark.asyncio
 async def test_stream_session_rejects_initial_non_accepted_event_before_streaming_audio(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -252,3 +312,4 @@ async def test_stream_session_rejects_initial_non_accepted_event_before_streamin
         ).stream_session(hello(), audio_frames())
 
     assert len(websocket.sent) == 1
+    assert websocket.close_count == 1

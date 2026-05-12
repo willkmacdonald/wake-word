@@ -68,6 +68,7 @@ export function buildServer(options: ServerOptions) {
       let session: Awaited<ReturnType<TranscriptionAdapter["start"]>> | undefined;
       let stopPromise: Promise<void> | undefined;
       let stopRequested = false;
+      let sessionEndedRecorded = false;
       const sessionId = nanoid();
 
       function sendJson(message: unknown) {
@@ -80,6 +81,10 @@ export function buildServer(options: ServerOptions) {
         stopRequested = true;
         if (!session) {
           return Promise.resolve();
+        }
+        if (!sessionEndedRecorded) {
+          metrics.recordSessionEnded();
+          sessionEndedRecorded = true;
         }
         stopPromise ??= session.stop().catch((error) => {
           request.log.error({ error, sessionId }, "failed to stop transcription session");
@@ -106,11 +111,11 @@ export function buildServer(options: ServerOptions) {
             session = await transcription.start(sessionId, (event) => {
               sendJson(event);
             });
+            metrics.recordSessionStarted();
             if (stopRequested || socket.readyState !== socket.OPEN) {
               await stopSession();
               return;
             }
-            metrics.recordSessionStarted();
             accepted = true;
             sendJson(sessionAccepted(sessionId));
             return;
@@ -124,7 +129,6 @@ export function buildServer(options: ServerOptions) {
           const message = JSON.parse(messageToBuffer(raw).toString());
           if (message.type === "stop") {
             await stopSession();
-            metrics.recordSessionEnded();
             sendJson({ type: "session.ended", sessionId, reason: message.reason });
             socket.close();
           }

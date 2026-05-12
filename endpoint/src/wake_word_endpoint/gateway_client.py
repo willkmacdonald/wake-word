@@ -53,7 +53,7 @@ class GatewayRetryPolicy:
         jitter = (
             0.0 if self.jitter_ratio == 0 else random.uniform(0.0, base_delay * self.jitter_ratio)
         )
-        return base_delay + jitter
+        return min(self.max_delay_seconds, base_delay + jitter)
 
 
 class GatewayConnectionError(RuntimeError):
@@ -109,6 +109,7 @@ class GatewayClient:
     async def _connect_and_accept(self, hello: SessionHello) -> tuple[Any, list[ServerMessage]]:
         last_error: Exception | None = None
         for attempt in range(self.retry_policy.max_attempts):
+            websocket: Any | None = None
             try:
                 headers = GatewayHeaders(
                     endpoint_id=self.endpoint_id,
@@ -118,19 +119,26 @@ class GatewayClient:
                 await websocket.send(hello.to_json())
                 accepted_raw = await websocket.recv()
                 if not isinstance(accepted_raw, str):
-                    await websocket.close()
                     raise RuntimeError("gateway accepted response must be JSON text")
-                accepted = parse_server_message(accepted_raw)
+                try:
+                    accepted = parse_server_message(accepted_raw)
+                except ValueError as error:
+                    raise RuntimeError(f"gateway accepted response is invalid: {error}") from error
                 if accepted.type != "session.accepted":
-                    await websocket.close()
                     raise RuntimeError(
                         f"gateway first event must be session.accepted, got {accepted.type}"
                     )
                 return websocket, [accepted]
             except (OSError, TimeoutError, websockets.exceptions.WebSocketException) as error:
                 last_error = error
+                if websocket is not None:
+                    await websocket.close()
                 if attempt == self.retry_policy.max_attempts - 1:
                     break
                 await asyncio.sleep(self.retry_policy.delay_for_attempt(attempt))
+            except Exception:
+                if websocket is not None:
+                    await websocket.close()
+                raise
         reason = str(last_error) if last_error else "unknown error"
         raise GatewayConnectionError(self.endpoint_id, self.retry_policy.max_attempts, reason)

@@ -155,6 +155,9 @@ describe("gateway server", () => {
 
       await withTimeout(stopped, "session was not stopped after client close");
       expect(stopCalls).toBe(1);
+      const metrics = await app.inject({ method: "GET", url: "/metrics" });
+      expect(metrics.body).toContain("wake_word_gateway_sessions_started_total 1");
+      expect(metrics.body).toContain("wake_word_gateway_sessions_ended_total 1");
     } finally {
       ws.close();
       await app.close();
