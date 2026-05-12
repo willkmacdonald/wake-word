@@ -104,6 +104,7 @@ Create this structure:
 ├── gateway/
 │   ├── README.md
 │   ├── Dockerfile
+│   ├── package-lock.json
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── vitest.config.ts
@@ -136,6 +137,7 @@ Create this structure:
 - Create: `pyproject.toml`
 - Create: `endpoint/README.md`
 - Create: `gateway/README.md`
+- Create: `gateway/package-lock.json` via `npm install`
 - Create: `gateway/package.json`
 - Create: `gateway/tsconfig.json`
 - Create: `gateway/vitest.config.ts`
