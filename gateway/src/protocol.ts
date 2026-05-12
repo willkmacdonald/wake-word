@@ -86,11 +86,11 @@ export function parseHelloMessage(value: unknown): HelloMessage {
   };
 }
 
-export function sessionAccepted(sessionId: string) {
+export function sessionAccepted(sessionId: string, maxSessionSeconds = 60) {
   return {
     type: "session.accepted",
     sessionId,
-    maxSessionSeconds: 60,
+    maxSessionSeconds,
     acceptedAudio: {
       format: "pcm_s16le",
       sampleRateHz: 16000,

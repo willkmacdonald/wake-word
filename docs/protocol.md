@@ -11,7 +11,10 @@ Authorization: Bearer dev-token
 X-Endpoint-Id: mac-studio-01
 ```
 
-Device tokens authenticate the endpoint to the gateway. Azure Speech credentials are never sent to endpoints.
+Device tokens authenticate the endpoint to the gateway. The gateway can also be
+configured with an explicit endpoint allow-list; when set, `X-Endpoint-Id` must
+match that list before the session is accepted. Azure Speech credentials are
+never sent to endpoints.
 
 ## Client Hello
 
@@ -41,6 +44,10 @@ The first websocket message is JSON:
 ## Audio Frames
 
 After `session.accepted`, binary websocket messages contain raw 16 kHz mono signed 16-bit little-endian PCM audio. A 20 ms frame is 640 bytes.
+
+The server enforces the advertised max session duration and an idle timeout.
+When either limit fires, it sends `session.ended` with reason `max_duration` or
+`idle_timeout` and closes the websocket.
 
 ## Server Events
 

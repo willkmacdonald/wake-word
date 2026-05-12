@@ -10,6 +10,16 @@
 
 ---
 
+## Execution Note
+
+This file is the pre-execution plan and includes original draft snippets. During
+execution, the Azure deployment shape was changed to satisfy the cost constraint:
+the actual template in `infra/container-app.bicep` reuses
+`shared-services-rg/shared-services-env`, `wkmsharedservicesacr`, and
+`wkm-shared-kv`; uses managed identity and Key Vault secret references; sets
+`GATEWAY_ALLOWED_ENDPOINT_IDS`; and outputs a `wss://` websocket URL. Do not
+copy the older Task 11 Bicep snippet below for deployment work.
+
 ## Scope
 
 This plan implements the approved design spec in `docs/superpowers/specs/2026-05-11-wake-word-design.md` through these checkpoints:

@@ -21,4 +21,15 @@ describe("authenticate", () => {
 
     expect(result.ok).toBe(false);
   });
+
+  it("rejects endpoint ids outside the allow list", () => {
+    const result = authenticate({
+      authorization: "Bearer dev-token",
+      endpointId: "unknown-endpoint",
+      expectedToken: "dev-token",
+      allowedEndpointIds: ["mac-studio-01", "wakepi-01"]
+    });
+
+    expect(result).toEqual({ ok: false, reason: "endpoint id is not allowed" });
+  });
 });

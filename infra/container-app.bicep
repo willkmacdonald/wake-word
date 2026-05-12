@@ -10,6 +10,7 @@ param keyVaultName string = 'wkm-shared-kv'
 param gatewayDeviceTokenSecretName string = 'gateway-device-token'
 param azureSpeechKeySecretName string = 'azure-speech-key'
 param azureSpeechRegion string
+param allowedEndpointIds string = 'mac-studio-01,wakepi-01'
 @minValue(0)
 param minReplicas int = 1
 @minValue(1)
@@ -101,6 +102,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'AZURE_SPEECH_REGION'
               value: azureSpeechRegion
+            }
+            {
+              name: 'GATEWAY_ALLOWED_ENDPOINT_IDS'
+              value: allowedEndpointIds
             }
           ]
           resources: {

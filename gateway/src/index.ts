@@ -1,12 +1,13 @@
+import { readRuntimeConfig } from "./config.js";
 import { buildServer } from "./server.js";
 
-const port = Number(process.env.PORT ?? "8080");
-const host = process.env.HOST ?? "0.0.0.0";
+const config = readRuntimeConfig();
 
 const server = buildServer({
-  deviceToken: process.env.GATEWAY_DEVICE_TOKEN ?? "dev-token",
-  transcriptionMode: process.env.TRANSCRIPTION_MODE === "azure" ? "azure" : "mock"
+  deviceToken: config.deviceToken,
+  transcriptionMode: config.transcriptionMode,
+  allowedEndpointIds: config.allowedEndpointIds
 });
 
-await server.listen({ port, host });
-console.log(`wake-word gateway listening on ${host}:${port}`);
+await server.listen({ port: config.port, host: config.host });
+console.log(`wake-word gateway listening on ${config.host}:${config.port}`);

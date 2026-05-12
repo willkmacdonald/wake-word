@@ -84,11 +84,14 @@ az deployment group create \
   --resource-group "$AZURE_RESOURCE_GROUP" \
   --template-file infra/container-app.bicep \
   --parameters \
-    azureSpeechRegion="$AZURE_SPEECH_REGION"
+    azureSpeechRegion="$AZURE_SPEECH_REGION" \
+    allowedEndpointIds="mac-studio-01,wakepi-01"
 ```
 
 By default, the template pulls `wkmsharedservicesacr.azurecr.io/wake-word-gateway:latest`.
 Override `imageTag`, `imageRepository`, or `image` if you need a different image.
+Set `allowedEndpointIds` to the endpoint ids that are allowed to use the gateway
+with a valid device token.
 
 The template creates `wake-word-gateway-identity`, grants it `AcrPull` on the
 shared ACR and `Key Vault Secrets User` on the shared Key Vault, then assigns it

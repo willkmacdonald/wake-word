@@ -12,6 +12,9 @@ export type ServerOptions = {
   deviceToken: string;
   transcriptionMode: "mock" | "azure";
   transcriptionAdapter?: TranscriptionAdapter;
+  allowedEndpointIds?: readonly string[];
+  maxSessionSeconds?: number;
+  idleTimeoutSeconds?: number;
 };
 
 type WebSocketMessage = Buffer | ArrayBuffer | Buffer[];
@@ -40,6 +43,15 @@ export function buildServer(options: ServerOptions) {
   const app = Fastify({ logger: true });
   const transcription = options.transcriptionAdapter ?? buildTranscriptionAdapter(options.transcriptionMode);
   const metrics = new GatewayMetrics();
+  const maxSessionSeconds = options.maxSessionSeconds ?? 60;
+  const idleTimeoutSeconds = options.idleTimeoutSeconds ?? 10;
+
+  if (maxSessionSeconds <= 0) {
+    throw new Error("maxSessionSeconds must be positive");
+  }
+  if (idleTimeoutSeconds <= 0) {
+    throw new Error("idleTimeoutSeconds must be positive");
+  }
 
   app.register(websocket);
 
@@ -54,7 +66,8 @@ export function buildServer(options: ServerOptions) {
       const auth = authenticate({
         authorization: request.headers.authorization,
         endpointId: request.headers["x-endpoint-id"]?.toString(),
-        expectedToken: options.deviceToken
+        expectedToken: options.deviceToken,
+        allowedEndpointIds: options.allowedEndpointIds
       });
 
       if (!auth.ok) {
@@ -69,6 +82,9 @@ export function buildServer(options: ServerOptions) {
       let stopPromise: Promise<void> | undefined;
       let stopRequested = false;
       let sessionEndedRecorded = false;
+      let sessionFinished = false;
+      let maxSessionTimer: NodeJS.Timeout | undefined;
+      let idleTimer: NodeJS.Timeout | undefined;
       const sessionId = nanoid();
 
       function sendJson(message: unknown) {
@@ -77,8 +93,20 @@ export function buildServer(options: ServerOptions) {
         }
       }
 
+      function clearSessionTimers() {
+        if (maxSessionTimer) {
+          clearTimeout(maxSessionTimer);
+          maxSessionTimer = undefined;
+        }
+        if (idleTimer) {
+          clearTimeout(idleTimer);
+          idleTimer = undefined;
+        }
+      }
+
       function stopSession() {
         stopRequested = true;
+        clearSessionTimers();
         if (!session) {
           return Promise.resolve();
         }
@@ -90,6 +118,32 @@ export function buildServer(options: ServerOptions) {
           request.log.error({ error, sessionId }, "failed to stop transcription session");
         });
         return stopPromise;
+      }
+
+      async function finishSession(reason: string) {
+        if (sessionFinished) {
+          return;
+        }
+        sessionFinished = true;
+        await stopSession();
+        sendJson({ type: "session.ended", sessionId, reason });
+        socket.close();
+      }
+
+      function scheduleSessionLimits() {
+        maxSessionTimer = setTimeout(() => {
+          void finishSession("max_duration");
+        }, Math.ceil(maxSessionSeconds * 1000));
+        resetIdleTimer();
+      }
+
+      function resetIdleTimer() {
+        if (idleTimer) {
+          clearTimeout(idleTimer);
+        }
+        idleTimer = setTimeout(() => {
+          void finishSession("idle_timeout");
+        }, Math.ceil(idleTimeoutSeconds * 1000));
       }
 
       socket.on("close", () => {
@@ -117,20 +171,24 @@ export function buildServer(options: ServerOptions) {
               return;
             }
             accepted = true;
-            sendJson(sessionAccepted(sessionId));
+            scheduleSessionLimits();
+            sendJson(sessionAccepted(sessionId, maxSessionSeconds));
+            return;
+          }
+
+          if (sessionFinished) {
             return;
           }
 
           if (isBinary) {
+            resetIdleTimer();
             session?.pushAudio(messageToBuffer(raw));
             return;
           }
 
           const message = JSON.parse(messageToBuffer(raw).toString());
           if (message.type === "stop") {
-            await stopSession();
-            sendJson({ type: "session.ended", sessionId, reason: message.reason });
-            socket.close();
+            await finishSession(message.reason ?? "manual");
           }
         } catch (error) {
           metrics.recordError();

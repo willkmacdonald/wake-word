@@ -86,3 +86,18 @@ bash -n scripts/pi/check_audio.sh
 
 Actual Pi microphone capture still needs to be run on the Raspberry Pi 5 after
 fresh setup.
+
+## Live Endpoint Run
+
+Once microphone profiling is acceptable, start the gateway and run the real
+endpoint path:
+
+```bash
+. .venv/bin/activate
+export GATEWAY_DEVICE_TOKEN=<gateway device token>
+wake-endpoint run endpoint/configs/pi.example.yaml --run-id pi-live-001 --max-listen-seconds 30
+```
+
+The command uses the microphone and the wake engine named in the endpoint config.
+The example configs use `fake` so you can verify capture and gateway streaming
+before installing OpenWakeWord or Porcupine.

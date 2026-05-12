@@ -164,6 +164,104 @@ describe("gateway server", () => {
     }
   });
 
+  it("ends sessions that exceed the configured max duration", async () => {
+    let stopCalls = 0;
+    const transcriptionAdapter: TranscriptionAdapter = {
+      async start() {
+        return {
+          pushAudio() {},
+          async stop() {
+            stopCalls += 1;
+          }
+        };
+      }
+    };
+
+    const app = buildServer({
+      deviceToken: "dev-token",
+      transcriptionMode: "mock",
+      transcriptionAdapter,
+      maxSessionSeconds: 0.01,
+      idleTimeoutSeconds: 1
+    });
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const address = app.server.address() as AddressInfo;
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/v1/audio`, {
+      headers: {
+        Authorization: "Bearer dev-token",
+        "X-Endpoint-Id": "mac-studio-01"
+      }
+    });
+    const nextMessage = collectJsonMessages(ws);
+
+    try {
+      await once(ws, "open");
+      ws.send(JSON.stringify(helloMessage()));
+      const accepted = await nextMessage();
+      const ended = await withTimeout(nextMessage(), "max duration did not end session");
+
+      expect(accepted.type).toBe("session.accepted");
+      expect(ended).toEqual({
+        type: "session.ended",
+        sessionId: accepted.sessionId,
+        reason: "max_duration"
+      });
+      expect(stopCalls).toBe(1);
+    } finally {
+      ws.close();
+      await app.close();
+    }
+  });
+
+  it("ends sessions that stop sending audio before the idle timeout", async () => {
+    let stopCalls = 0;
+    const transcriptionAdapter: TranscriptionAdapter = {
+      async start() {
+        return {
+          pushAudio() {},
+          async stop() {
+            stopCalls += 1;
+          }
+        };
+      }
+    };
+
+    const app = buildServer({
+      deviceToken: "dev-token",
+      transcriptionMode: "mock",
+      transcriptionAdapter,
+      maxSessionSeconds: 1,
+      idleTimeoutSeconds: 0.01
+    });
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const address = app.server.address() as AddressInfo;
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/v1/audio`, {
+      headers: {
+        Authorization: "Bearer dev-token",
+        "X-Endpoint-Id": "mac-studio-01"
+      }
+    });
+    const nextMessage = collectJsonMessages(ws);
+
+    try {
+      await once(ws, "open");
+      ws.send(JSON.stringify(helloMessage()));
+      const accepted = await nextMessage();
+      const ended = await withTimeout(nextMessage(), "idle timeout did not end session");
+
+      expect(accepted.type).toBe("session.accepted");
+      expect(ended).toEqual({
+        type: "session.ended",
+        sessionId: accepted.sessionId,
+        reason: "idle_timeout"
+      });
+      expect(stopCalls).toBe(1);
+    } finally {
+      ws.close();
+      await app.close();
+    }
+  });
+
   it("stops a session that starts after the client has already closed", async () => {
     let resolveStart: (() => void) | undefined;
     let resolveStartCalled: (() => void) | undefined;
@@ -242,6 +340,34 @@ describe("gateway server", () => {
       expect(error.message).toBe("invalid bearer token");
       const metrics = await app.inject({ method: "GET", url: "/metrics" });
       expect(metrics.body).toContain("wake_word_gateway_errors_total 1");
+    } finally {
+      ws.close();
+      await app.close();
+    }
+  });
+
+  it("rejects endpoint ids outside the configured allow list", async () => {
+    const app = buildServer({
+      deviceToken: "dev-token",
+      transcriptionMode: "mock",
+      allowedEndpointIds: ["wakepi-01"]
+    });
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const address = app.server.address() as AddressInfo;
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/v1/audio`, {
+      headers: {
+        Authorization: "Bearer dev-token",
+        "X-Endpoint-Id": "mac-studio-01"
+      }
+    });
+    const nextMessage = collectJsonMessages(ws);
+
+    try {
+      await once(ws, "open");
+      const error = await nextMessage();
+
+      expect(error.type).toBe("error");
+      expect(error.message).toBe("endpoint id is not allowed");
     } finally {
       ws.close();
       await app.close();
