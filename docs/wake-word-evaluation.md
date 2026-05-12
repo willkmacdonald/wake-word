@@ -11,3 +11,10 @@ Install with:
 ```bash
 python -m pip install -e ".[openwakeword]"
 ```
+
+Download the pre-trained models once on each evaluation machine before using
+`OpenWakeWordEngine.from_default_model()`:
+
+```bash
+python -c "import openwakeword; openwakeword.utils.download_models()"
+```
