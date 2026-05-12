@@ -21,6 +21,14 @@ sudo apt full-upgrade -y
 sudo apt install -y git python3-full python3-venv python3-pip build-essential pkg-config alsa-utils portaudio19-dev ffmpeg sox
 ```
 
+Clone or copy this repository onto the Pi, then run the remaining commands from
+the repository root:
+
+```bash
+git clone <repository-url> wake-word
+cd wake-word
+```
+
 Validate the USB microphone:
 
 ```bash
