@@ -27,3 +27,27 @@ def config_check(config: Path) -> None:
             "gateway_url": loaded.gateway.url,
         }
     )
+
+
+@app.command()
+def mic_probe(config: Path, frames: int = 50) -> None:
+    """Capture a short microphone sample and print frame statistics."""
+    from wake_word_endpoint.audio import MicrophoneAudioSource
+
+    loaded = load_config(config)
+    source = MicrophoneAudioSource(
+        device=loaded.microphone.device,
+        sample_rate_hz=loaded.microphone.sample_rate_hz,
+        channels=loaded.microphone.channels,
+        frame_duration_ms=loaded.session.frame_duration_ms,
+    )
+    captured = list(source.frames(max_frames=frames))
+    total_bytes = sum(len(frame.pcm) for frame in captured)
+    print(
+        {
+            "frames": len(captured),
+            "total_bytes": total_bytes,
+            "sample_rate_hz": loaded.microphone.sample_rate_hz,
+            "channels": loaded.microphone.channels,
+        }
+    )
