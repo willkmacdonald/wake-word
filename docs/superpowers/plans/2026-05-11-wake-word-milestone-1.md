@@ -142,6 +142,7 @@ Create this structure:
 - Create: `gateway/tsconfig.json`
 - Create: `gateway/vitest.config.ts`
 - Create: `gateway/src/index.ts`
+- Create: `gateway/src/server.ts`
 - Create: `gateway/test/protocol.test.ts`
 - Create: `eval/README.md`
 - Create: `docs/architecture.md`
@@ -335,6 +336,25 @@ const server = buildServer({
 
 await server.listen({ port, host });
 console.log(`wake-word gateway listening on ${host}:${port}`);
+```
+
+Create `gateway/src/server.ts`:
+
+```ts
+import Fastify from "fastify";
+
+export type ServerOptions = {
+  deviceToken: string;
+  transcriptionMode: "mock" | "azure";
+};
+
+export function buildServer(_options: ServerOptions) {
+  const app = Fastify({ logger: true });
+
+  app.get("/healthz", async () => ({ ok: true }));
+
+  return app;
+}
 ```
 
 Create `gateway/test/protocol.test.ts`:
@@ -1795,7 +1815,7 @@ git commit -m "feat: add endpoint session controller"
 - Create: `gateway/src/auth.ts`
 - Create: `gateway/src/transcription/types.ts`
 - Create: `gateway/src/transcription/mock.ts`
-- Create: `gateway/src/server.ts`
+- Modify: `gateway/src/server.ts`
 - Create: `gateway/test/auth.test.ts`
 - Create: `gateway/test/server.test.ts`
 
@@ -1956,9 +1976,9 @@ export class MockTranscriptionAdapter implements TranscriptionAdapter {
 }
 ```
 
-- [ ] **Step 5: Implement websocket server**
+- [ ] **Step 5: Replace scaffold server with websocket server**
 
-Create `gateway/src/server.ts`:
+Replace `gateway/src/server.ts` with:
 
 ```ts
 import websocket from "@fastify/websocket";
