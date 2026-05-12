@@ -22,8 +22,32 @@ This plan implements the approved design spec in `docs/superpowers/specs/2026-05
 - Checkpoint F: Raspberry Pi 5 bring-up script/docs.
 - Checkpoint G: first OpenWakeWord and Porcupine plugin adapters behind the same engine interface.
 - Checkpoint H: live trial reporting for observational Mac/Pi comparison.
+- Checkpoint I: review-driven hardening for network failures, negative tests, Pi audio profiling, Azure latency posture, and explicit next-phase evaluation work.
 
 Clinical note generation, EHR integration, HIPAA claims, simultaneous Mac/Pi microphone comparison, and recorded fixture evaluation remain out of scope.
+
+## External Review Disposition
+
+An external LLM reviewed this plan before execution. Incorporate the valid findings without expanding Milestone 1 into a full reproducible audio lab.
+
+Accepted into Milestone 1:
+
+- Add endpoint gateway retry/backoff behavior and explicit gateway connection failure errors.
+- Add negative tests for gateway authentication, malformed hello messages, and gateway client retry policy.
+- Add Raspberry Pi audio profiling and ALSA/CoreAudio difference notes so Mac/Pi comparisons do not assume identical audio behavior.
+- Keep Azure Container Apps `minReplicas: 1` and document it as a latency choice, then verify `/healthz` and trigger-to-first-transcript latency during milestone verification.
+- Add lightweight gateway metrics for session and error counts.
+
+Deferred to the next evaluation milestone:
+
+- Recorded fixture library with positive phrases, negative samples, silence, and noise overlays.
+- SNR/noisy-environment test curves for surgical-suite-like conditions.
+- Audio preprocessing experiments such as gain control, high-pass filtering, and noise suppression.
+
+Rejected for Milestone 1:
+
+- Replacing websocket audio transport with RTP, UDP, or gRPC. WebSocket remains the first endpoint/gateway transport because it combines control and post-trigger audio in one authenticated channel and is adequate for validating the architecture.
+- Generalizing the audio contract beyond 16 kHz mono PCM. Milestone 1 keeps 16 kHz, mono, signed 16-bit little-endian PCM as the explicit contract. Resampling and format negotiation belong in a later compatibility milestone.
 
 ## File Structure
 
@@ -3181,7 +3205,540 @@ git add eval docs/wake-word-evaluation.md
 git commit -m "feat: add live trial reporting"
 ```
 
-## Task 16: Final Milestone Verification
+## Task 16: Review-Driven Hardening
+
+**Files:**
+- Modify: `endpoint/src/wake_word_endpoint/gateway_client.py`
+- Modify: `endpoint/tests/test_gateway_client.py`
+- Modify: `endpoint/src/wake_word_endpoint/controller.py`
+- Modify: `endpoint/tests/test_controller.py`
+- Modify: `endpoint/src/wake_word_endpoint/cli.py`
+- Modify: `gateway/src/server.ts`
+- Create: `gateway/src/metrics.ts`
+- Create: `gateway/test/metrics.test.ts`
+- Modify: `gateway/test/server.test.ts`
+- Modify: `docs/azure-gateway.md`
+- Modify: `docs/hardware.md`
+- Modify: `docs/wake-word-evaluation.md`
+
+- [ ] **Step 1: Add endpoint retry policy tests**
+
+Append to `endpoint/tests/test_gateway_client.py`:
+
+```python
+import pytest
+
+from wake_word_endpoint.gateway_client import GatewayConnectionError, GatewayRetryPolicy
+
+
+def test_retry_policy_uses_bounded_exponential_backoff_without_jitter_for_tests():
+    policy = GatewayRetryPolicy(
+        max_attempts=4,
+        base_delay_seconds=0.25,
+        max_delay_seconds=1.0,
+        jitter_ratio=0.0,
+    )
+
+    assert [policy.delay_for_attempt(attempt) for attempt in range(3)] == [0.25, 0.5, 1.0]
+
+
+def test_retry_policy_rejects_invalid_attempt_count():
+    with pytest.raises(ValueError, match="max_attempts must be at least 1"):
+        GatewayRetryPolicy(max_attempts=0)
+
+
+def test_gateway_connection_error_names_endpoint_and_attempts():
+    error = GatewayConnectionError(endpoint_id="mac-studio-01", attempts=3, reason="refused")
+
+    assert "mac-studio-01" in str(error)
+    assert "3 attempts" in str(error)
+    assert "refused" in str(error)
+```
+
+- [ ] **Step 2: Implement endpoint retry policy and connection error**
+
+Update `endpoint/src/wake_word_endpoint/gateway_client.py`:
+
+```python
+from __future__ import annotations
+
+import asyncio
+import random
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from typing import Any
+
+import websockets
+
+from wake_word_endpoint.audio import AudioFrame
+from wake_word_endpoint.protocol import ClientStop, ServerMessage, SessionHello, parse_server_message
+
+
+@dataclass(frozen=True)
+class GatewayHeaders:
+    endpoint_id: str
+    token: str
+
+    def to_headers(self) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {self.token}",
+            "X-Endpoint-Id": self.endpoint_id,
+        }
+
+
+@dataclass(frozen=True)
+class GatewayRetryPolicy:
+    max_attempts: int = 3
+    base_delay_seconds: float = 0.25
+    max_delay_seconds: float = 2.0
+    jitter_ratio: float = 0.2
+
+    def __post_init__(self) -> None:
+        if self.max_attempts < 1:
+            raise ValueError("max_attempts must be at least 1")
+        if self.base_delay_seconds <= 0:
+            raise ValueError("base_delay_seconds must be positive")
+        if self.max_delay_seconds < self.base_delay_seconds:
+            raise ValueError("max_delay_seconds must be greater than or equal to base_delay_seconds")
+        if self.jitter_ratio < 0:
+            raise ValueError("jitter_ratio must not be negative")
+
+    def delay_for_attempt(self, attempt: int) -> float:
+        base_delay = min(self.max_delay_seconds, self.base_delay_seconds * (2**attempt))
+        jitter = 0.0 if self.jitter_ratio == 0 else random.uniform(0.0, base_delay * self.jitter_ratio)
+        return base_delay + jitter
+
+
+class GatewayConnectionError(RuntimeError):
+    def __init__(self, endpoint_id: str, attempts: int, reason: str) -> None:
+        super().__init__(
+            f"gateway connection failed for endpoint {endpoint_id} after {attempts} attempts: {reason}"
+        )
+
+
+class GatewayClient:
+    def __init__(
+        self,
+        url: str,
+        endpoint_id: str,
+        token: str,
+        retry_policy: GatewayRetryPolicy | None = None,
+    ) -> None:
+        self.url = url
+        self.endpoint_id = endpoint_id
+        self.token = token
+        self.retry_policy = retry_policy or GatewayRetryPolicy()
+
+    async def stream_session(
+        self,
+        hello: SessionHello,
+        frames: AsyncIterator[AudioFrame],
+        stop_reason: str = "manual",
+    ) -> list[ServerMessage]:
+        websocket, events = await self._connect_and_accept(hello)
+        try:
+            async for frame in frames:
+                await websocket.send(frame.pcm)
+            await websocket.send(ClientStop(reason=stop_reason).to_json())
+            while True:
+                raw = await websocket.recv()
+                if not isinstance(raw, str):
+                    raise RuntimeError("gateway event must be JSON text")
+                event = parse_server_message(raw)
+                events.append(event)
+                if event.type in {"session.ended", "error"}:
+                    break
+        except (OSError, TimeoutError, websockets.exceptions.WebSocketException) as error:
+            raise GatewayConnectionError(
+                self.endpoint_id,
+                attempts=1,
+                reason=f"active stream interrupted: {error}",
+            ) from error
+        finally:
+            await websocket.close()
+        return events
+
+    async def _connect_and_accept(self, hello: SessionHello) -> tuple[Any, list[ServerMessage]]:
+        last_error: Exception | None = None
+        for attempt in range(self.retry_policy.max_attempts):
+            try:
+                headers = GatewayHeaders(endpoint_id=self.endpoint_id, token=self.token).to_headers()
+                websocket = await websockets.connect(self.url, additional_headers=headers)
+                await websocket.send(hello.to_json())
+                accepted_raw = await websocket.recv()
+                if not isinstance(accepted_raw, str):
+                    await websocket.close()
+                    raise RuntimeError("gateway accepted response must be JSON text")
+                accepted = parse_server_message(accepted_raw)
+                return websocket, [accepted]
+            except (OSError, TimeoutError, websockets.exceptions.WebSocketException) as error:
+                last_error = error
+                if attempt == self.retry_policy.max_attempts - 1:
+                    break
+                await asyncio.sleep(self.retry_policy.delay_for_attempt(attempt))
+        reason = str(last_error) if last_error else "unknown error"
+        raise GatewayConnectionError(self.endpoint_id, self.retry_policy.max_attempts, reason)
+```
+
+- [ ] **Step 3: Stream controller frames as they are captured**
+
+Update `_async_frames` and the wake-detection branch in `endpoint/src/wake_word_endpoint/controller.py`:
+
+```python
+import asyncio
+```
+
+```python
+async def _async_frames(
+    source_iter,
+    max_frames: int,
+) -> AsyncIterator[AudioFrame]:
+    for _, frame in zip(range(max_frames), source_iter, strict=False):
+        yield frame
+        await asyncio.sleep(0)
+```
+
+```python
+            hello = SessionHello(
+                endpoint_id=self.endpoint_id,
+                endpoint_type=self.endpoint_type,
+                run_id=self.run_id,
+                audio=AudioSpec(
+                    sample_rate_hz=self.sample_rate_hz,
+                    channels=self.channels,
+                    frame_duration_ms=self.frame_duration_ms,
+                ),
+                wake=WakeSpec(engine=detection.engine, phrase_track=detection.phrase_track),
+                started_at=dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
+            )
+            return await self.gateway_client.stream_session(
+                hello,
+                _async_frames(source_iter, self.max_stream_frames),
+            )
+        return []
+```
+
+Keep `endpoint/tests/test_controller.py` asserting `gateway.streamed_frames == 5`. That assertion now proves the controller starts the gateway session after wake detection and streams exactly the next five frames without pre-buffering them into a list.
+
+- [ ] **Step 4: Add gateway metrics tests**
+
+Create `gateway/test/metrics.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { GatewayMetrics } from "../src/metrics.js";
+
+describe("GatewayMetrics", () => {
+  it("renders Prometheus-style counters", () => {
+    const metrics = new GatewayMetrics();
+    metrics.recordSessionStarted();
+    metrics.recordSessionEnded();
+    metrics.recordError();
+
+    const text = metrics.render();
+
+    expect(text).toContain("wake_word_gateway_sessions_started_total 1");
+    expect(text).toContain("wake_word_gateway_sessions_ended_total 1");
+    expect(text).toContain("wake_word_gateway_errors_total 1");
+  });
+});
+```
+
+- [ ] **Step 5: Implement gateway metrics**
+
+Create `gateway/src/metrics.ts`:
+
+```ts
+export class GatewayMetrics {
+  private sessionsStarted = 0;
+  private sessionsEnded = 0;
+  private errors = 0;
+
+  recordSessionStarted() {
+    this.sessionsStarted += 1;
+  }
+
+  recordSessionEnded() {
+    this.sessionsEnded += 1;
+  }
+
+  recordError() {
+    this.errors += 1;
+  }
+
+  render() {
+    return [
+      "# TYPE wake_word_gateway_sessions_started_total counter",
+      `wake_word_gateway_sessions_started_total ${this.sessionsStarted}`,
+      "# TYPE wake_word_gateway_sessions_ended_total counter",
+      `wake_word_gateway_sessions_ended_total ${this.sessionsEnded}`,
+      "# TYPE wake_word_gateway_errors_total counter",
+      `wake_word_gateway_errors_total ${this.errors}`,
+      ""
+    ].join("\n");
+  }
+}
+```
+
+- [ ] **Step 6: Add gateway negative websocket tests**
+
+Append to `gateway/test/server.test.ts`:
+
+```ts
+  it("rejects invalid endpoint tokens", async () => {
+    const app = buildServer({ deviceToken: "dev-token", transcriptionMode: "mock" });
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const address = app.server.address() as AddressInfo;
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/v1/audio`, {
+      headers: {
+        Authorization: "Bearer wrong-token",
+        "X-Endpoint-Id": "mac-studio-01"
+      }
+    });
+
+    await once(ws, "open");
+    const error = JSON.parse((await once(ws, "message"))[0].toString());
+
+    expect(error.type).toBe("error");
+    expect(error.message).toBe("invalid bearer token");
+
+    ws.close();
+    await app.close();
+  });
+
+  it("returns an error for malformed hello messages", async () => {
+    const app = buildServer({ deviceToken: "dev-token", transcriptionMode: "mock" });
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const address = app.server.address() as AddressInfo;
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/v1/audio`, {
+      headers: {
+        Authorization: "Bearer dev-token",
+        "X-Endpoint-Id": "mac-studio-01"
+      }
+    });
+
+    await once(ws, "open");
+    ws.send(JSON.stringify({ type: "hello", protocolVersion: "wrong" }));
+    const error = JSON.parse((await once(ws, "message"))[0].toString());
+
+    expect(error.type).toBe("error");
+    expect(error.message).toContain("unsupported protocol version");
+
+    ws.close();
+    await app.close();
+  });
+```
+
+- [ ] **Step 7: Wire metrics into the gateway server**
+
+Modify `gateway/src/server.ts`:
+
+```ts
+import websocket from "@fastify/websocket";
+import Fastify from "fastify";
+import { nanoid } from "nanoid";
+import { authenticate } from "./auth.js";
+import { GatewayMetrics } from "./metrics.js";
+import { errorMessage, parseHelloMessage, sessionAccepted } from "./protocol.js";
+import { AzureSpeechAdapter } from "./transcription/azureSpeech.js";
+import { MockTranscriptionAdapter } from "./transcription/mock.js";
+import { TranscriptionAdapter } from "./transcription/types.js";
+```
+
+Add a metrics instance near the transcription adapter:
+
+```ts
+  const transcription = buildTranscriptionAdapter(options.transcriptionMode);
+  const metrics = new GatewayMetrics();
+```
+
+Add the metrics route after `/healthz`:
+
+```ts
+  app.get("/metrics", async (_request, reply) => {
+    reply.type("text/plain; version=0.0.4");
+    return metrics.render();
+  });
+```
+
+Record auth and session failures:
+
+```ts
+    if (!auth.ok) {
+      metrics.recordError();
+      socket.send(JSON.stringify(errorMessage(auth.reason)));
+      socket.close();
+      return;
+    }
+```
+
+Record started, ended, and error counts inside the message handler:
+
+```ts
+          session = await transcription.start(sessionId, (event) => {
+            socket.send(JSON.stringify(event));
+          });
+          metrics.recordSessionStarted();
+          accepted = true;
+          socket.send(JSON.stringify(sessionAccepted(sessionId)));
+          return;
+```
+
+```ts
+        if (message.type === "stop") {
+          await session?.stop();
+          metrics.recordSessionEnded();
+          socket.send(JSON.stringify({ type: "session.ended", sessionId, reason: message.reason }));
+          socket.close();
+        }
+```
+
+```ts
+      } catch (error) {
+        metrics.recordError();
+        const message = error instanceof Error ? error.message : "unknown gateway error";
+        socket.send(JSON.stringify(errorMessage(message)));
+        socket.close();
+      }
+```
+
+- [ ] **Step 8: Add Pi audio profiling CLI command**
+
+Append to `endpoint/src/wake_word_endpoint/cli.py`:
+
+```python
+
+@app.command()
+def audio_profile(config: Path, frames: int = 200) -> None:
+    """Capture microphone frames and print simple timing/buffer profile data."""
+    import statistics
+    import time
+
+    from wake_word_endpoint.audio import MicrophoneAudioSource
+
+    loaded = load_config(config)
+    source = MicrophoneAudioSource(
+        device=loaded.microphone.device,
+        sample_rate_hz=loaded.microphone.sample_rate_hz,
+        channels=loaded.microphone.channels,
+        frame_duration_ms=loaded.session.frame_duration_ms,
+    )
+
+    timestamps: list[float] = []
+    byte_counts: list[int] = []
+    for frame in source.frames(max_frames=frames):
+        timestamps.append(time.monotonic())
+        byte_counts.append(len(frame.pcm))
+
+    intervals_ms = [
+        (current - previous) * 1000 for previous, current in zip(timestamps, timestamps[1:])
+    ]
+    print(
+        {
+            "frames": len(byte_counts),
+            "expected_frame_duration_ms": loaded.session.frame_duration_ms,
+            "bytes_per_frame_min": min(byte_counts),
+            "bytes_per_frame_max": max(byte_counts),
+            "interval_ms_mean": round(statistics.mean(intervals_ms), 2) if intervals_ms else None,
+            "interval_ms_max": round(max(intervals_ms), 2) if intervals_ms else None,
+        }
+    )
+```
+
+- [ ] **Step 9: Document Pi/Mac audio profiling and platform differences**
+
+Append to `docs/hardware.md`:
+
+```markdown
+## Audio Profiling Before Wake-Word Comparison
+
+Do not assume the Mac Studio and Raspberry Pi 5 expose identical microphone behavior. The Mac uses CoreAudio; the Pi uses Linux audio APIs such as ALSA, and USB timing, default devices, and buffer behavior can differ.
+
+Run this before comparing wake-word engines on each endpoint:
+
+```bash
+. .venv/bin/activate
+wake-endpoint audio-profile endpoint/configs/mac.example.yaml --frames 200
+```
+
+On the Pi:
+
+```bash
+. .venv/bin/activate
+wake-endpoint audio-profile endpoint/configs/pi.example.yaml --frames 200
+```
+
+Record the mean and max inter-frame interval in each live trial. If the Pi shows large timing spikes or capture errors, fix the audio device configuration before attributing poor results to a wake-word engine.
+```
+
+- [ ] **Step 10: Document Azure latency posture and metrics**
+
+Append to `docs/azure-gateway.md`:
+
+```markdown
+## Latency And Health Checks
+
+The Container Apps deployment keeps `minReplicas: 1` intentionally. This avoids cold-start latency during demos and makes trigger-to-first-transcript measurements more meaningful.
+
+Verify the gateway before live trials:
+
+```bash
+curl -fsS "$GATEWAY_BASE_URL/healthz"
+curl -fsS "$GATEWAY_BASE_URL/metrics"
+```
+
+Record trigger-to-first-transcript latency in live trial reports. Treat latency spikes as gateway/Azure/network findings until endpoint capture timing has also been checked.
+```
+
+- [ ] **Step 11: Document deferred evaluation lab work**
+
+Append to `docs/wake-word-evaluation.md`:
+
+```markdown
+## Deferred Evaluation Lab
+
+Milestone 1 uses live microphone trials only. That is enough to validate the architecture and catch obvious integration failures, but it is not enough to make strong accuracy claims.
+
+The next evaluation milestone should add:
+
+- recorded positive wake-phrase fixtures
+- negative speech samples that should not trigger
+- silence and idle-room samples for false accept testing
+- controllable noise overlays for SNR curves
+- surgical-suite-like noise profiles when legally and practically available
+- optional preprocessing experiments, measured against the raw-audio baseline
+
+Do not enable audio preprocessing by default until raw engine behavior has been measured. Preprocessing should be an explicit experiment so it does not hide engine-specific weaknesses.
+```
+
+- [ ] **Step 12: Run hardening tests**
+
+Run:
+
+```bash
+. .venv/bin/activate
+pytest endpoint/tests/test_gateway_client.py endpoint/tests/test_controller.py -q
+cd gateway
+npm test -- metrics.test.ts server.test.ts
+npm run typecheck
+```
+
+Expected:
+
+```text
+Gateway client retry policy tests pass
+Gateway metrics and negative websocket tests pass
+Gateway typecheck passes
+```
+
+- [ ] **Step 13: Commit**
+
+```bash
+git add endpoint/src/wake_word_endpoint/gateway_client.py endpoint/src/wake_word_endpoint/controller.py endpoint/src/wake_word_endpoint/cli.py endpoint/tests/test_gateway_client.py endpoint/tests/test_controller.py gateway/src gateway/test docs
+git commit -m "feat: harden gateway streaming path"
+```
+
+## Task 17: Final Milestone Verification
 
 **Files:**
 - Modify: `README.md`
@@ -3278,6 +3835,7 @@ Implemented:
 - Raspberry Pi 5 bring-up docs and audio check script
 - OpenWakeWord and Porcupine adapter wrappers
 - live-trial observational report format
+- gateway retry policy, negative protocol tests, Pi audio profiling, and basic gateway metrics
 
 Verified:
 
@@ -3285,6 +3843,7 @@ Verified:
 - gateway tests and typecheck
 - local fake endpoint to mock gateway smoke test
 - Mac microphone probe when USB mic is attached
+- gateway `/healthz` and `/metrics` when deployed or running locally
 ```
 
 - [ ] **Step 6: Commit**
@@ -3305,11 +3864,14 @@ git commit -m "docs: document milestone verification"
   - Raspberry Pi 5 setup is covered by Task 12.
   - Live-only observational evaluation is covered by Task 15.
   - Multiple wake-word engines are covered by Tasks 13 and 14.
+  - External review hardening is covered by Task 16.
+  - Recorded fixtures, noise curves, and preprocessing experiments are explicitly deferred outside Milestone 1.
 - Type consistency:
   - Python wire keys are camelCase only at the JSON boundary.
   - Python internal dataclasses use snake_case.
   - Gateway protocol uses the same `wake-word.v1` contract as the endpoint.
   - Audio is fixed to 16 kHz, mono, PCM signed 16-bit little-endian for the first milestone.
+  - WebSocket remains the Milestone 1 endpoint/gateway transport.
 - Verification gates:
   - Every implementation task has test or smoke-test commands.
   - Every task ends with a narrow commit.
