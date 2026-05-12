@@ -1113,6 +1113,11 @@ from wake_word_endpoint.config import load_config
 app = typer.Typer(no_args_is_help=True)
 
 
+@app.callback()
+def main() -> None:
+    """Wake-word endpoint command line tools."""
+
+
 @app.command()
 def config_check(config: Path) -> None:
     """Load an endpoint config and print the effective endpoint identity."""
