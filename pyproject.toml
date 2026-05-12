@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wake-word-endpoint"
+version = "0.1.0"
+description = "Local wake-word endpoint and evaluation tooling"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=2.0.0",
+  "psutil>=6.0.0",
+  "PyYAML>=6.0.2",
+  "rich>=13.9.0",
+  "sounddevice>=0.5.0",
+  "typer>=0.12.0",
+  "websockets>=14.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.0",
+  "pytest-asyncio>=0.24.0",
+  "ruff>=0.8.0",
+]
+openwakeword = [
+  "openwakeword>=0.6.0",
+]
+porcupine = [
+  "pvporcupine>=3.0.0",
+]
+
+[project.scripts]
+wake-endpoint = "wake_word_endpoint.cli:app"
+wake-eval-report = "wake_word_eval.report:app"
+
+[tool.setuptools.packages.find]
+where = ["endpoint/src", "eval/src"]
+
+[tool.pytest.ini_options]
+testpaths = ["endpoint/tests", "eval/tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
