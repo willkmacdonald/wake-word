@@ -2157,7 +2157,18 @@ def test_gateway_headers_include_endpoint_id_and_bearer_token():
 
 def test_parse_session_lifecycle_events():
     accepted = parse_server_message(
-        '{"type":"session.accepted","sessionId":"abc","maxSessionSeconds":60}'
+        """
+        {
+          "type": "session.accepted",
+          "sessionId": "abc",
+          "maxSessionSeconds": 60,
+          "acceptedAudio": {
+            "format": "pcm_s16le",
+            "sampleRateHz": 16000,
+            "channels": 1
+          }
+        }
+        """
     )
     ended = parse_server_message('{"type":"session.ended","sessionId":"abc","reason":"manual"}')
 
@@ -2217,12 +2228,8 @@ Modify the end of `run_fake` in `endpoint/src/wake_word_endpoint/cli.py` so it p
         print(event)
 ```
 
-Modify `EndpointController.run_once` in `endpoint/src/wake_word_endpoint/controller.py` to return gateway events:
-
-```python
-            return await self.gateway_client.stream_session(hello, _async_frames(post_trigger_frames))
-        return []
-```
+`EndpointController.run_once` already returns gateway events from Task 7. Do not reintroduce buffered
+`post_trigger_frames`; keep the controller streaming live frames from the source iterator.
 
 - [ ] **Step 5: Re-run local integration**
 
