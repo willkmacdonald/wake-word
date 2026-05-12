@@ -143,4 +143,62 @@ describe("gateway server", () => {
       await app.close();
     }
   });
+
+  it("stops a session that starts after the client has already closed", async () => {
+    let resolveStart: (() => void) | undefined;
+    let resolveStartCalled: (() => void) | undefined;
+    const startCalled = new Promise<void>((resolve) => {
+      resolveStartCalled = resolve;
+    });
+    let stopCalls = 0;
+    let resolveStopped: (() => void) | undefined;
+    const stopped = new Promise<void>((resolve) => {
+      resolveStopped = resolve;
+    });
+    const transcriptionAdapter: TranscriptionAdapter = {
+      async start() {
+        resolveStartCalled?.();
+        await new Promise<void>((resolve) => {
+          resolveStart = resolve;
+        });
+        return {
+          pushAudio() {},
+          async stop() {
+            stopCalls += 1;
+            resolveStopped?.();
+          }
+        };
+      }
+    };
+
+    const app = buildServer({
+      deviceToken: "dev-token",
+      transcriptionMode: "mock",
+      transcriptionAdapter
+    });
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const address = app.server.address() as AddressInfo;
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/v1/audio`, {
+      headers: {
+        Authorization: "Bearer dev-token",
+        "X-Endpoint-Id": "mac-studio-01"
+      }
+    });
+
+    try {
+      await once(ws, "open");
+      ws.send(JSON.stringify(helloMessage()));
+      await withTimeout(startCalled, "transcription start was not called");
+
+      ws.close();
+      await withTimeout(once(ws, "close"), "client websocket did not close");
+      resolveStart?.();
+
+      await withTimeout(stopped, "session was not stopped after delayed start resolved");
+      expect(stopCalls).toBe(1);
+    } finally {
+      ws.close();
+      await app.close();
+    }
+  });
 });

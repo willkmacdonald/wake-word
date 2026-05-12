@@ -60,6 +60,7 @@ export function buildServer(options: ServerOptions) {
       let accepted = false;
       let session: Awaited<ReturnType<TranscriptionAdapter["start"]>> | undefined;
       let stopPromise: Promise<void> | undefined;
+      let stopRequested = false;
       const sessionId = nanoid();
 
       function sendJson(message: unknown) {
@@ -69,6 +70,7 @@ export function buildServer(options: ServerOptions) {
       }
 
       function stopSession() {
+        stopRequested = true;
         if (!session) {
           return Promise.resolve();
         }
@@ -97,6 +99,10 @@ export function buildServer(options: ServerOptions) {
             session = await transcription.start(sessionId, (event) => {
               sendJson(event);
             });
+            if (stopRequested || socket.readyState !== socket.OPEN) {
+              await stopSession();
+              return;
+            }
             accepted = true;
             sendJson(sessionAccepted(sessionId));
             return;
