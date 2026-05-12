@@ -41,3 +41,11 @@ Provide the access key with an environment variable:
 read -r -s PICOVOICE_ACCESS_KEY
 export PICOVOICE_ACCESS_KEY
 ```
+
+Evaluation harnesses should read `PICOVOICE_ACCESS_KEY` and pass it explicitly to
+`PorcupineEngine.from_keywords()`. The adapter does not read environment
+variables directly.
+
+Porcupine requires 16 kHz mono frames with exactly `porcupine.frame_length`
+samples. Configure endpoint frame duration to match the selected Porcupine engine
+or add a reframing buffer before using this adapter.
