@@ -45,8 +45,14 @@ class EndpointController:
         self.max_stream_frames = max_stream_frames
 
     async def run_once(self, max_listen_frames: int | None = None) -> list[Any]:
-        source_iter = self.audio_source.frames(max_frames=max_listen_frames)
-        for frame in source_iter:
+        source_iter = self.audio_source.frames()
+        listen_frames = 0
+        while max_listen_frames is None or listen_frames < max_listen_frames:
+            try:
+                frame = next(source_iter)
+            except StopIteration:
+                return []
+            listen_frames += 1
             detection = self.wake_engine.process(frame)
             if detection is None:
                 continue
