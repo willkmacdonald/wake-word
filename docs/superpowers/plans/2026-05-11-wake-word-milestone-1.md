@@ -1695,7 +1695,8 @@ Create `endpoint/src/wake_word_endpoint/controller.py`:
 from __future__ import annotations
 
 import datetime as dt
-from collections.abc import AsyncIterator
+import asyncio
+from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
 from wake_word_endpoint.audio import AudioFrame, AudioSource
@@ -1703,9 +1704,13 @@ from wake_word_endpoint.protocol import AudioSpec, SessionHello, WakeSpec
 from wake_word_endpoint.wake_engines.base import WakeEngine
 
 
-async def _async_frames(frames: list[AudioFrame]) -> AsyncIterator[AudioFrame]:
-    for frame in frames:
+async def _async_frames(
+    source_iter: Iterator[AudioFrame],
+    max_frames: int,
+) -> AsyncIterator[AudioFrame]:
+    for _, frame in zip(range(max_frames), source_iter, strict=False):
         yield frame
+        await asyncio.sleep(0)
 
 
 class EndpointController:
@@ -1733,16 +1738,12 @@ class EndpointController:
         self.frame_duration_ms = frame_duration_ms
         self.max_stream_frames = max_stream_frames
 
-    async def run_once(self, max_listen_frames: int | None = None) -> None:
+    async def run_once(self, max_listen_frames: int | None = None) -> list[Any]:
         source_iter = self.audio_source.frames(max_frames=max_listen_frames)
         for frame in source_iter:
             detection = self.wake_engine.process(frame)
             if detection is None:
                 continue
-
-            post_trigger_frames: list[AudioFrame] = []
-            for _, stream_frame in zip(range(self.max_stream_frames), source_iter, strict=False):
-                post_trigger_frames.append(stream_frame)
 
             hello = SessionHello(
                 endpoint_id=self.endpoint_id,
@@ -1756,8 +1757,11 @@ class EndpointController:
                 wake=WakeSpec(engine=detection.engine, phrase_track=detection.phrase_track),
                 started_at=dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
             )
-            await self.gateway_client.stream_session(hello, _async_frames(post_trigger_frames))
-            return
+            return await self.gateway_client.stream_session(
+                hello,
+                _async_frames(source_iter, self.max_stream_frames),
+            )
+        return []
 ```
 
 - [ ] **Step 4: Add run-fake CLI**
