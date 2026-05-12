@@ -18,7 +18,7 @@ After first SSH login:
 ```bash
 sudo apt update
 sudo apt full-upgrade -y
-sudo apt install -y git python3-full python3-venv python3-pip build-essential pkg-config alsa-utils portaudio19-dev ffmpeg sox
+sudo apt install -y git python3-full python3-venv python3-pip build-essential pkg-config usbutils alsa-utils portaudio19-dev ffmpeg sox
 ```
 
 Clone or copy this repository onto the Pi, then run the remaining commands from
