@@ -86,4 +86,6 @@ def run_fake(config: Path, token: str = "dev-token", run_id: str = "manual-run")
         frame_duration_ms=loaded.session.frame_duration_ms,
         max_stream_frames=100,
     )
-    asyncio.run(controller.run_once(max_listen_frames=200))
+    events = asyncio.run(controller.run_once(max_listen_frames=200))
+    for event in events or []:
+        print(event)

@@ -22,3 +22,21 @@ The endpoint must not stream audio before local wake-word activation. Azure cred
 ## First Milestone
 
 Run a local endpoint with a fake wake engine against a gateway mock, then replace the mock transcription adapter with Azure Speech and deploy the gateway to Azure Container Apps.
+
+## Local Gateway Smoke Test
+
+Terminal 1:
+
+```bash
+cd gateway
+GATEWAY_DEVICE_TOKEN=dev-token TRANSCRIPTION_MODE=mock npm run dev
+```
+
+Terminal 2:
+
+```bash
+. .venv/bin/activate
+wake-endpoint run-fake endpoint/configs/mac.example.yaml --token dev-token --run-id local-fake-001
+```
+
+Expected: the endpoint prints `session.accepted`, `transcript.final`, and `session.ended`.

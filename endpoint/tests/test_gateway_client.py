@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 import pytest
 from wake_word_endpoint.audio import AudioFrame
 from wake_word_endpoint.gateway_client import GatewayClient, GatewayHeaders
-from wake_word_endpoint.protocol import AudioSpec, SessionHello, WakeSpec
+from wake_word_endpoint.protocol import AudioSpec, SessionHello, WakeSpec, parse_server_message
 
 
 def test_gateway_headers_include_endpoint_id_and_bearer_token():
@@ -62,6 +62,29 @@ def accepted_event() -> str:
             },
         }
     )
+
+
+def test_parse_session_lifecycle_events():
+    accepted = parse_server_message(
+        """
+        {
+          "type": "session.accepted",
+          "sessionId": "abc",
+          "maxSessionSeconds": 60,
+          "acceptedAudio": {
+            "format": "pcm_s16le",
+            "sampleRateHz": 16000,
+            "channels": 1
+          }
+        }
+        """
+    )
+    ended = parse_server_message('{"type":"session.ended","sessionId":"abc","reason":"manual"}')
+
+    assert accepted.type == "session.accepted"
+    assert accepted.session_id == "abc"
+    assert ended.type == "session.ended"
+    assert ended.reason == "manual"
 
 
 def hello() -> SessionHello:
