@@ -21,7 +21,7 @@ The endpoint must not stream audio before local wake-word activation. Azure cred
 
 ## First Milestone
 
-Run a local endpoint with a fake wake engine against a gateway mock, then replace the mock transcription adapter with Azure Speech and deploy the gateway to Azure Container Apps.
+Run a local endpoint with a fake wake engine against a gateway mock, then add the Azure Speech adapter and Container Apps deployment files for the cloud gateway path.
 
 ## Local Gateway Smoke Test
 
@@ -61,3 +61,9 @@ Verified on May 12, 2026:
 - local fake endpoint to mock gateway smoke test
 - Mac microphone probe when USB mic is attached
 - gateway `/healthz` and `/metrics` when running locally
+
+Not yet verified:
+
+- live Azure Container Apps deployment
+- live Azure Speech transcription path
+- Raspberry Pi 5 microphone capture after fresh setup

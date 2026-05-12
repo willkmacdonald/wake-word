@@ -64,7 +64,10 @@ Use `eval/live_trial_template.yaml` as the run record format.
 
 ## Deferred Evaluation Lab
 
-Milestone 1 uses live microphone trials only. That is enough to validate the architecture and catch obvious integration failures, but it is not enough to make strong accuracy claims.
+Milestone 1 defines the live microphone trial format and verifies the reporter,
+but it does not complete a Mac-vs-Pi live wake-word evaluation. The next
+hands-on evaluation step is to run the live trial protocol on the Mac Studio and
+Raspberry Pi 5, then treat those results as observational only.
 
 The next evaluation milestone should add:
 
