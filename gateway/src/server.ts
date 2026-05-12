@@ -10,6 +10,7 @@ import { TranscriptionAdapter } from "./transcription/types.js";
 export type ServerOptions = {
   deviceToken: string;
   transcriptionMode: "mock" | "azure";
+  transcriptionAdapter?: TranscriptionAdapter;
 };
 
 type WebSocketMessage = Buffer | ArrayBuffer | Buffer[];
@@ -36,7 +37,7 @@ function buildTranscriptionAdapter(mode: "mock" | "azure"): TranscriptionAdapter
 
 export function buildServer(options: ServerOptions) {
   const app = Fastify({ logger: true });
-  const transcription = buildTranscriptionAdapter(options.transcriptionMode);
+  const transcription = options.transcriptionAdapter ?? buildTranscriptionAdapter(options.transcriptionMode);
 
   app.register(websocket);
 
@@ -58,7 +59,32 @@ export function buildServer(options: ServerOptions) {
 
       let accepted = false;
       let session: Awaited<ReturnType<TranscriptionAdapter["start"]>> | undefined;
+      let stopPromise: Promise<void> | undefined;
       const sessionId = nanoid();
+
+      function sendJson(message: unknown) {
+        if (socket.readyState === socket.OPEN) {
+          socket.send(JSON.stringify(message));
+        }
+      }
+
+      function stopSession() {
+        if (!session) {
+          return Promise.resolve();
+        }
+        stopPromise ??= session.stop().catch((error) => {
+          request.log.error({ error, sessionId }, "failed to stop transcription session");
+        });
+        return stopPromise;
+      }
+
+      socket.on("close", () => {
+        void stopSession();
+      });
+
+      socket.on("error", () => {
+        void stopSession();
+      });
 
       socket.on("message", async (raw: WebSocketMessage, isBinary: boolean) => {
         try {
@@ -69,10 +95,10 @@ export function buildServer(options: ServerOptions) {
               throw new Error("endpoint id mismatch");
             }
             session = await transcription.start(sessionId, (event) => {
-              socket.send(JSON.stringify(event));
+              sendJson(event);
             });
             accepted = true;
-            socket.send(JSON.stringify(sessionAccepted(sessionId)));
+            sendJson(sessionAccepted(sessionId));
             return;
           }
 
@@ -83,13 +109,14 @@ export function buildServer(options: ServerOptions) {
 
           const message = JSON.parse(messageToBuffer(raw).toString());
           if (message.type === "stop") {
-            await session?.stop();
-            socket.send(JSON.stringify({ type: "session.ended", sessionId, reason: message.reason }));
+            await stopSession();
+            sendJson({ type: "session.ended", sessionId, reason: message.reason });
             socket.close();
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : "unknown gateway error";
-          socket.send(JSON.stringify(errorMessage(message)));
+          sendJson(errorMessage(message));
+          await stopSession();
           socket.close();
         }
       });

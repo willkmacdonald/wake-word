@@ -3,6 +3,7 @@ import { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import { buildServer } from "../src/server.js";
+import { TranscriptionAdapter } from "../src/transcription/types.js";
 
 function collectJsonMessages(ws: WebSocket) {
   const messages: string[] = [];
@@ -28,6 +29,43 @@ function collectJsonMessages(ws: WebSocket) {
   };
 }
 
+function helloMessage() {
+  return {
+    type: "hello",
+    protocolVersion: "wake-word.v1",
+    endpointId: "mac-studio-01",
+    endpointType: "mac-studio",
+    runId: "run-001",
+    audio: {
+      format: "pcm_s16le",
+      sampleRateHz: 16000,
+      channels: 1,
+      frameDurationMs: 20
+    },
+    wake: {
+      engine: "fake",
+      phraseTrack: "builtin-baseline"
+    },
+    startedAt: "2026-05-11T18:00:00Z"
+  };
+}
+
+async function withTimeout<T>(promise: Promise<T>, message: string) {
+  let timeout: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), 250);
+      })
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
 describe("gateway server", () => {
   it("accepts hello, binary audio, stop, and returns transcript events", async () => {
     const app = buildServer({ deviceToken: "dev-token", transcriptionMode: "mock" });
@@ -42,26 +80,7 @@ describe("gateway server", () => {
     const nextMessage = collectJsonMessages(ws);
 
     await once(ws, "open");
-    ws.send(
-      JSON.stringify({
-        type: "hello",
-        protocolVersion: "wake-word.v1",
-        endpointId: "mac-studio-01",
-        endpointType: "mac-studio",
-        runId: "run-001",
-        audio: {
-          format: "pcm_s16le",
-          sampleRateHz: 16000,
-          channels: 1,
-          frameDurationMs: 20
-        },
-        wake: {
-          engine: "fake",
-          phraseTrack: "builtin-baseline"
-        },
-        startedAt: "2026-05-11T18:00:00Z"
-      })
-    );
+    ws.send(JSON.stringify(helloMessage()));
     const accepted = await nextMessage();
     ws.send(Buffer.alloc(640));
     ws.send(JSON.stringify({ type: "stop", reason: "manual" }));
@@ -74,5 +93,54 @@ describe("gateway server", () => {
 
     ws.close();
     await app.close();
+  });
+
+  it("stops a started transcription session when the client closes before stop", async () => {
+    let stopCalls = 0;
+    let resolveStopped: (() => void) | undefined;
+    const stopped = new Promise<void>((resolve) => {
+      resolveStopped = resolve;
+    });
+    const transcriptionAdapter: TranscriptionAdapter = {
+      async start() {
+        return {
+          pushAudio() {},
+          async stop() {
+            stopCalls += 1;
+            resolveStopped?.();
+          }
+        };
+      }
+    };
+
+    const app = buildServer({
+      deviceToken: "dev-token",
+      transcriptionMode: "mock",
+      transcriptionAdapter
+    });
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const address = app.server.address() as AddressInfo;
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/v1/audio`, {
+      headers: {
+        Authorization: "Bearer dev-token",
+        "X-Endpoint-Id": "mac-studio-01"
+      }
+    });
+    const nextMessage = collectJsonMessages(ws);
+
+    try {
+      await once(ws, "open");
+      ws.send(JSON.stringify(helloMessage()));
+      const accepted = await nextMessage();
+      expect(accepted.type).toBe("session.accepted");
+
+      ws.close();
+
+      await withTimeout(stopped, "session was not stopped after client close");
+      expect(stopCalls).toBe(1);
+    } finally {
+      ws.close();
+      await app.close();
+    }
   });
 });
