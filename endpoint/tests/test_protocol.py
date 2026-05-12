@@ -92,6 +92,16 @@ def test_parse_session_accepted_event_from_gateway():
         {
             "type": "session.accepted",
             "sessionId": "session-001",
+            "maxSessionSeconds": True,
+            "acceptedAudio": {
+                "format": "pcm_s16le",
+                "sampleRateHz": 16000,
+                "channels": 1,
+            },
+        },
+        {
+            "type": "session.accepted",
+            "sessionId": "session-001",
             "maxSessionSeconds": 60,
             "acceptedAudio": {
                 "format": "pcm_s16le",

@@ -87,7 +87,7 @@ def _require_string(payload: dict[str, object], key: str) -> str:
 
 def _require_int(payload: dict[str, object], key: str) -> int:
     value = payload.get(key)
-    if not isinstance(value, int):
+    if isinstance(value, bool) or not isinstance(value, int):
         raise ValueError(f"{key} is required")
     return value
 
