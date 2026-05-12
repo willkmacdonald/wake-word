@@ -51,3 +51,39 @@ def mic_probe(config: Path, frames: int = 50) -> None:
             "channels": loaded.microphone.channels,
         }
     )
+
+
+@app.command()
+def run_fake(config: Path, token: str = "dev-token", run_id: str = "manual-run") -> None:
+    """Run the endpoint with generated audio and a fake wake event."""
+    import asyncio
+
+    from wake_word_endpoint.audio import GeneratedAudioSource
+    from wake_word_endpoint.controller import EndpointController
+    from wake_word_endpoint.gateway_client import GatewayClient
+    from wake_word_endpoint.wake_engines.fake import FakeWakeEngine
+
+    loaded = load_config(config)
+    source = GeneratedAudioSource(
+        sample_rate_hz=loaded.microphone.sample_rate_hz,
+        channels=loaded.microphone.channels,
+        frame_duration_ms=loaded.session.frame_duration_ms,
+    )
+    gateway = GatewayClient(
+        url=loaded.gateway.url,
+        endpoint_id=loaded.endpoint.id,
+        token=token,
+    )
+    controller = EndpointController(
+        endpoint_id=loaded.endpoint.id,
+        endpoint_type=loaded.endpoint.type,
+        run_id=run_id,
+        audio_source=source,
+        wake_engine=FakeWakeEngine(trigger_after_frames=10),
+        gateway_client=gateway,
+        sample_rate_hz=loaded.microphone.sample_rate_hz,
+        channels=loaded.microphone.channels,
+        frame_duration_ms=loaded.session.frame_duration_ms,
+        max_stream_frames=100,
+    )
+    asyncio.run(controller.run_once(max_listen_frames=200))
