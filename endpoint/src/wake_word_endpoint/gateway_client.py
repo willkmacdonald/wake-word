@@ -46,6 +46,10 @@ class GatewayClient:
             if not isinstance(accepted_raw, str):
                 raise RuntimeError("gateway accepted response must be JSON text")
             accepted = parse_server_message(accepted_raw)
+            if accepted.type != "session.accepted":
+                raise RuntimeError(
+                    f"gateway first event must be session.accepted, got {accepted.type}"
+                )
             events.append(accepted)
             async for frame in frames:
                 await websocket.send(frame.pcm)
