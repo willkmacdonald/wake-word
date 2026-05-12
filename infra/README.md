@@ -33,6 +33,7 @@ AZURE_CONTAINER_REGISTRY="wkmsharedservicesacr"
 az acr login --name "$AZURE_CONTAINER_REGISTRY"
 docker tag wake-word-gateway:local "$AZURE_CONTAINER_REGISTRY.azurecr.io/wake-word-gateway:latest"
 docker push "$AZURE_CONTAINER_REGISTRY.azurecr.io/wake-word-gateway:latest"
+cd ..
 ```
 
 ## Azure-side operator identity

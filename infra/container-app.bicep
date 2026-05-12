@@ -137,4 +137,4 @@ resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-
   }
 }
 
-output gatewayUrl string = 'https://${app.properties.configuration.ingress.fqdn}/v1/audio'
+output gatewayUrl string = 'wss://${app.properties.configuration.ingress.fqdn}/v1/audio'
