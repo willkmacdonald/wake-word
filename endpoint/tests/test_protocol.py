@@ -79,6 +79,26 @@ def test_parse_session_accepted_event_from_gateway():
     [
         {"type": "transcript.partial", "sessionId": "session-001", "offsetMs": 320},
         {"type": "session.accepted", "maxSessionSeconds": 60},
+        {
+            "type": "session.accepted",
+            "sessionId": "session-001",
+            "maxSessionSeconds": "sixty",
+            "acceptedAudio": {
+                "format": "pcm_s16le",
+                "sampleRateHz": 16000,
+                "channels": 1,
+            },
+        },
+        {
+            "type": "session.accepted",
+            "sessionId": "session-001",
+            "maxSessionSeconds": 60,
+            "acceptedAudio": {
+                "format": "pcm_s16le",
+                "sampleRateHz": 48000,
+                "channels": 1,
+            },
+        },
         {"type": "error"},
         {"type": 42},
     ],

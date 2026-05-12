@@ -92,6 +92,18 @@ def _require_int(payload: dict[str, object], key: str) -> int:
     return value
 
 
+def _validate_accepted_audio(payload: dict[str, object]) -> None:
+    accepted_audio = payload.get("acceptedAudio")
+    if not isinstance(accepted_audio, dict):
+        raise ValueError("acceptedAudio is required")
+    if (
+        accepted_audio.get("format") != "pcm_s16le"
+        or accepted_audio.get("sampleRateHz") != 16000
+        or accepted_audio.get("channels") != 1
+    ):
+        raise ValueError("acceptedAudio must be 16 kHz mono pcm_s16le")
+
+
 def parse_server_message(raw: str) -> ServerMessage:
     payload = json.loads(raw)
     if not isinstance(payload, dict):
@@ -106,6 +118,8 @@ def parse_server_message(raw: str) -> ServerMessage:
             offset_ms=_require_int(payload, "offsetMs"),
         )
     if message_type == "session.accepted":
+        _require_int(payload, "maxSessionSeconds")
+        _validate_accepted_audio(payload)
         return ServerMessage(
             type=message_type,
             session_id=_require_string(payload, "sessionId"),
