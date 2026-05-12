@@ -67,6 +67,20 @@ async function withTimeout<T>(promise: Promise<T>, message: string) {
 }
 
 describe("gateway server", () => {
+  it("serves gateway metrics", async () => {
+    const app = buildServer({ deviceToken: "dev-token", transcriptionMode: "mock" });
+
+    try {
+      const response = await app.inject({ method: "GET", url: "/metrics" });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["content-type"]).toContain("text/plain");
+      expect(response.body).toContain("wake_word_gateway_sessions_started_total 0");
+    } finally {
+      await app.close();
+    }
+  });
+
   it("accepts hello, binary audio, stop, and returns transcript events", async () => {
     const app = buildServer({ deviceToken: "dev-token", transcriptionMode: "mock" });
     await app.listen({ port: 0, host: "127.0.0.1" });
@@ -90,6 +104,9 @@ describe("gateway server", () => {
     expect(accepted.type).toBe("session.accepted");
     expect(transcript.type).toBe("transcript.final");
     expect(ended.type).toBe("session.ended");
+    const metrics = await app.inject({ method: "GET", url: "/metrics" });
+    expect(metrics.body).toContain("wake_word_gateway_sessions_started_total 1");
+    expect(metrics.body).toContain("wake_word_gateway_sessions_ended_total 1");
 
     ws.close();
     await app.close();
@@ -196,6 +213,57 @@ describe("gateway server", () => {
 
       await withTimeout(stopped, "session was not stopped after delayed start resolved");
       expect(stopCalls).toBe(1);
+    } finally {
+      ws.close();
+      await app.close();
+    }
+  });
+
+  it("rejects invalid endpoint tokens", async () => {
+    const app = buildServer({ deviceToken: "dev-token", transcriptionMode: "mock" });
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const address = app.server.address() as AddressInfo;
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/v1/audio`, {
+      headers: {
+        Authorization: "Bearer wrong-token",
+        "X-Endpoint-Id": "mac-studio-01"
+      }
+    });
+    const nextMessage = collectJsonMessages(ws);
+
+    try {
+      await once(ws, "open");
+      const error = await nextMessage();
+
+      expect(error.type).toBe("error");
+      expect(error.message).toBe("invalid bearer token");
+      const metrics = await app.inject({ method: "GET", url: "/metrics" });
+      expect(metrics.body).toContain("wake_word_gateway_errors_total 1");
+    } finally {
+      ws.close();
+      await app.close();
+    }
+  });
+
+  it("returns an error for malformed hello messages", async () => {
+    const app = buildServer({ deviceToken: "dev-token", transcriptionMode: "mock" });
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const address = app.server.address() as AddressInfo;
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/v1/audio`, {
+      headers: {
+        Authorization: "Bearer dev-token",
+        "X-Endpoint-Id": "mac-studio-01"
+      }
+    });
+    const nextMessage = collectJsonMessages(ws);
+
+    try {
+      await once(ws, "open");
+      ws.send(JSON.stringify({ type: "hello", protocolVersion: "wrong" }));
+      const error = await nextMessage();
+
+      expect(error.type).toBe("error");
+      expect(error.message).toContain("unsupported protocol version");
     } finally {
       ws.close();
       await app.close();

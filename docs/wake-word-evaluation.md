@@ -61,3 +61,18 @@ For each run:
 5. Mark results as `observational-live`.
 
 Use `eval/live_trial_template.yaml` as the run record format.
+
+## Deferred Evaluation Lab
+
+Milestone 1 uses live microphone trials only. That is enough to validate the architecture and catch obvious integration failures, but it is not enough to make strong accuracy claims.
+
+The next evaluation milestone should add:
+
+- recorded positive wake-phrase fixtures
+- negative speech samples that should not trigger
+- silence and idle-room samples for false accept testing
+- controllable noise overlays for SNR curves
+- surgical-suite-like noise profiles when legally and practically available
+- optional preprocessing experiments, measured against the raw-audio baseline
+
+Do not enable audio preprocessing by default until raw engine behavior has been measured. Preprocessing should be an explicit experiment so it does not hide engine-specific weaknesses.

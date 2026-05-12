@@ -52,3 +52,23 @@ python -m pip install -e ".[dev]"
 ```
 
 Use a virtual environment because Raspberry Pi OS protects the system Python environment.
+
+## Audio Profiling Before Wake-Word Comparison
+
+Do not assume the Mac Studio and Raspberry Pi 5 expose identical microphone behavior. The Mac uses CoreAudio; the Pi uses Linux audio APIs such as ALSA, and USB timing, default devices, and buffer behavior can differ.
+
+Run this before comparing wake-word engines on each endpoint:
+
+```bash
+. .venv/bin/activate
+wake-endpoint audio-profile endpoint/configs/mac.example.yaml --frames 200
+```
+
+On the Pi:
+
+```bash
+. .venv/bin/activate
+wake-endpoint audio-profile endpoint/configs/pi.example.yaml --frames 200
+```
+
+Record the mean and max inter-frame interval in each live trial. If the Pi shows large timing spikes or capture errors, fix the audio device configuration before attributing poor results to a wake-word engine.

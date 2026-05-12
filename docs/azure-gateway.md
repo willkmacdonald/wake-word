@@ -45,3 +45,16 @@ The Container App is configured with `minReplicas: 1` by default in this milesto
 to avoid cold-start latency during wake-to-transcription demos. Set the deployment
 parameter `minReplicas=0` when parking the demo to reduce idle cost, with the
 expected cold-start tradeoff.
+
+## Latency And Health Checks
+
+The Container Apps deployment keeps `minReplicas: 1` intentionally. This avoids cold-start latency during demos and makes trigger-to-first-transcript measurements more meaningful.
+
+Verify the gateway before live trials:
+
+```bash
+curl -fsS "$GATEWAY_BASE_URL/healthz"
+curl -fsS "$GATEWAY_BASE_URL/metrics"
+```
+
+Record trigger-to-first-transcript latency in live trial reports. Treat latency spikes as gateway/Azure/network findings until endpoint capture timing has also been checked.

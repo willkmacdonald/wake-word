@@ -2,6 +2,7 @@ import websocket from "@fastify/websocket";
 import Fastify from "fastify";
 import { nanoid } from "nanoid";
 import { authenticate } from "./auth.js";
+import { GatewayMetrics } from "./metrics.js";
 import { errorMessage, parseHelloMessage, sessionAccepted } from "./protocol.js";
 import { AzureSpeechAdapter } from "./transcription/azureSpeech.js";
 import { MockTranscriptionAdapter } from "./transcription/mock.js";
@@ -38,10 +39,15 @@ function buildTranscriptionAdapter(mode: "mock" | "azure"): TranscriptionAdapter
 export function buildServer(options: ServerOptions) {
   const app = Fastify({ logger: true });
   const transcription = options.transcriptionAdapter ?? buildTranscriptionAdapter(options.transcriptionMode);
+  const metrics = new GatewayMetrics();
 
   app.register(websocket);
 
   app.get("/healthz", async () => ({ ok: true }));
+  app.get("/metrics", async (_request, reply) => {
+    reply.type("text/plain; version=0.0.4");
+    return metrics.render();
+  });
 
   app.after(() => {
     app.get("/v1/audio", { websocket: true }, (socket, request) => {
@@ -52,6 +58,7 @@ export function buildServer(options: ServerOptions) {
       });
 
       if (!auth.ok) {
+        metrics.recordError();
         socket.send(JSON.stringify(errorMessage(auth.reason)));
         socket.close();
         return;
@@ -103,6 +110,7 @@ export function buildServer(options: ServerOptions) {
               await stopSession();
               return;
             }
+            metrics.recordSessionStarted();
             accepted = true;
             sendJson(sessionAccepted(sessionId));
             return;
@@ -116,10 +124,12 @@ export function buildServer(options: ServerOptions) {
           const message = JSON.parse(messageToBuffer(raw).toString());
           if (message.type === "stop") {
             await stopSession();
+            metrics.recordSessionEnded();
             sendJson({ type: "session.ended", sessionId, reason: message.reason });
             socket.close();
           }
         } catch (error) {
+          metrics.recordError();
           const message = error instanceof Error ? error.message : "unknown gateway error";
           sendJson(errorMessage(message));
           await stopSession();

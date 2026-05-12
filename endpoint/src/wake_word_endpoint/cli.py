@@ -54,6 +54,44 @@ def mic_probe(config: Path, frames: int = 50) -> None:
 
 
 @app.command()
+def audio_profile(config: Path, frames: int = 200) -> None:
+    """Capture microphone frames and print simple timing/buffer profile data."""
+    import statistics
+    import time
+
+    from wake_word_endpoint.audio import MicrophoneAudioSource
+
+    loaded = load_config(config)
+    source = MicrophoneAudioSource(
+        device=loaded.microphone.device,
+        sample_rate_hz=loaded.microphone.sample_rate_hz,
+        channels=loaded.microphone.channels,
+        frame_duration_ms=loaded.session.frame_duration_ms,
+    )
+
+    timestamps: list[float] = []
+    byte_counts: list[int] = []
+    for frame in source.frames(max_frames=frames):
+        timestamps.append(time.monotonic())
+        byte_counts.append(len(frame.pcm))
+
+    intervals_ms = [
+        (current - previous) * 1000
+        for previous, current in zip(timestamps, timestamps[1:], strict=False)
+    ]
+    print(
+        {
+            "frames": len(byte_counts),
+            "expected_frame_duration_ms": loaded.session.frame_duration_ms,
+            "bytes_per_frame_min": min(byte_counts) if byte_counts else None,
+            "bytes_per_frame_max": max(byte_counts) if byte_counts else None,
+            "interval_ms_mean": round(statistics.mean(intervals_ms), 2) if intervals_ms else None,
+            "interval_ms_max": round(max(intervals_ms), 2) if intervals_ms else None,
+        }
+    )
+
+
+@app.command()
 def run_fake(config: Path, token: str = "dev-token", run_id: str = "manual-run") -> None:
     """Run the endpoint with generated audio and a fake wake event."""
     import asyncio
