@@ -1,0 +1,9 @@
+run_id: mac-openwakeword-001
+endpoint_type: mac-studio
+microphone: usb-mic-a
+wake_engine: openwakeword
+phrase_track: builtin-baseline
+false_accepts: 0
+missed_detections: 0
+trigger_to_first_transcript_ms: null
+notes: "quiet office, USB mic approximately 1 meter from speaker"

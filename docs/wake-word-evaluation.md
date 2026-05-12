@@ -49,3 +49,15 @@ variables directly.
 Porcupine requires 16 kHz mono frames with exactly `porcupine.frame_length`
 samples. Configure endpoint frame duration to match the selected Porcupine engine
 or add a reframing buffer before using this adapter.
+
+## Live Trial Protocol
+
+For each run:
+
+1. Record endpoint type, microphone, wake engine, phrase track, and room notes.
+2. Run idle listening and count false accepts.
+3. Speak the wake phrase ten times and count missed detections.
+4. Record time from trigger to first transcript when available.
+5. Mark results as `observational-live`.
+
+Use `eval/live_trial_template.yaml` as the run record format.
