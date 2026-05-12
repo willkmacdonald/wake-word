@@ -72,3 +72,17 @@ wake-endpoint audio-profile endpoint/configs/pi.example.yaml --frames 200
 ```
 
 Record the mean and max inter-frame interval in each live trial. If the Pi shows large timing spikes or capture errors, fix the audio device configuration before attributing poor results to a wake-word engine.
+
+## Milestone 1 Hardware Verification
+
+The Mac Studio microphone smoke test on May 12, 2026 captured 50 frames from
+`endpoint/configs/mac.example.yaml` with 32,000 total bytes at 16 kHz mono.
+
+The Raspberry Pi audio script has been syntax-checked locally with:
+
+```bash
+bash -n scripts/pi/check_audio.sh
+```
+
+Actual Pi microphone capture still needs to be run on the Raspberry Pi 5 after
+fresh setup.

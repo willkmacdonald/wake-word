@@ -76,3 +76,12 @@ The next evaluation milestone should add:
 - optional preprocessing experiments, measured against the raw-audio baseline
 
 Do not enable audio preprocessing by default until raw engine behavior has been measured. Preprocessing should be an explicit experiment so it does not hide engine-specific weaknesses.
+
+## Milestone 1 Verification
+
+The final milestone verification confirmed the live-trial reporter emits
+`metric_quality: observational-live` for `eval/live_trial_template.yaml`.
+
+This milestone does not make reproducible accuracy claims. Use the live reports
+to compare obvious integration behavior across Mac Studio and Raspberry Pi 5,
+then use the deferred evaluation lab work before making engine-quality claims.

@@ -40,3 +40,24 @@ wake-endpoint run-fake endpoint/configs/mac.example.yaml --token dev-token --run
 ```
 
 Expected: the endpoint prints `session.accepted`, `transcript.final`, and `session.ended`.
+
+## Milestone 1 Status
+
+Implemented:
+
+- endpoint/gateway protocol contract
+- Python endpoint config, audio source, fake wake engine, gateway client, and controller
+- TypeScript gateway websocket server with auth and mock transcription
+- Azure Speech adapter and Container Apps deployment files
+- Raspberry Pi 5 bring-up docs and audio check script
+- OpenWakeWord and Porcupine adapter wrappers
+- live-trial observational report format
+- gateway retry policy, negative protocol tests, Pi audio profiling, and basic gateway metrics
+
+Verified on May 12, 2026:
+
+- Python tests
+- gateway tests and typecheck
+- local fake endpoint to mock gateway smoke test
+- Mac microphone probe when USB mic is attached
+- gateway `/healthz` and `/metrics` when running locally
