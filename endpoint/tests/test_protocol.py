@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from wake_word_endpoint.protocol import AudioSpec, SessionHello, WakeSpec, parse_server_message
 
 
@@ -51,3 +52,37 @@ def test_parse_transcript_event_from_gateway():
     assert event.session_id == "session-001"
     assert event.text == "scalpel"
     assert event.offset_ms == 320
+
+
+def test_parse_session_accepted_event_from_gateway():
+    event = parse_server_message(
+        json.dumps(
+            {
+                "type": "session.accepted",
+                "sessionId": "session-001",
+                "maxSessionSeconds": 60,
+                "acceptedAudio": {
+                    "format": "pcm_s16le",
+                    "sampleRateHz": 16000,
+                    "channels": 1,
+                },
+            }
+        )
+    )
+
+    assert event.type == "session.accepted"
+    assert event.session_id == "session-001"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"type": "transcript.partial", "sessionId": "session-001", "offsetMs": 320},
+        {"type": "session.accepted", "maxSessionSeconds": 60},
+        {"type": "error"},
+        {"type": 42},
+    ],
+)
+def test_parse_server_message_rejects_invalid_event_shapes(payload):
+    with pytest.raises(ValueError):
+        parse_server_message(json.dumps(payload))

@@ -30,6 +30,13 @@ export type TranscriptEvent = {
   offsetMs: number;
 };
 
+function requireNonEmptyString(value: unknown, field: string): string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`${field} is required`);
+  }
+  return value;
+}
+
 export function parseHelloMessage(value: unknown): HelloMessage {
   if (!value || typeof value !== "object") {
     throw new Error("hello message must be an object");
@@ -41,15 +48,42 @@ export function parseHelloMessage(value: unknown): HelloMessage {
   if (payload.protocolVersion !== PROTOCOL_VERSION) {
     throw new Error(`unsupported protocol version: ${String(payload.protocolVersion)}`);
   }
+  if (!payload.audio || typeof payload.audio !== "object") {
+    throw new Error("audio is required");
+  }
   const audio = payload.audio as Record<string, unknown>;
-  const wake = payload.wake as Record<string, unknown>;
-  if (!audio || audio.format !== "pcm_s16le" || audio.sampleRateHz !== 16000 || audio.channels !== 1) {
+  if (
+    audio.format !== "pcm_s16le" ||
+    audio.sampleRateHz !== 16000 ||
+    audio.channels !== 1 ||
+    audio.frameDurationMs !== 20
+  ) {
     throw new Error("only 16 kHz mono pcm_s16le is accepted");
   }
-  if (typeof payload.endpointId !== "string" || payload.endpointId.length === 0) {
-    throw new Error("endpointId is required");
+
+  if (!payload.wake || typeof payload.wake !== "object") {
+    throw new Error("wake is required");
   }
-  return payload as HelloMessage;
+  const wake = payload.wake as Record<string, unknown>;
+
+  return {
+    type: "hello",
+    protocolVersion: PROTOCOL_VERSION,
+    endpointId: requireNonEmptyString(payload.endpointId, "endpointId"),
+    endpointType: requireNonEmptyString(payload.endpointType, "endpointType"),
+    runId: requireNonEmptyString(payload.runId, "runId"),
+    audio: {
+      format: "pcm_s16le",
+      sampleRateHz: 16000,
+      channels: 1,
+      frameDurationMs: 20
+    },
+    wake: {
+      engine: requireNonEmptyString(wake.engine, "wake.engine"),
+      phraseTrack: requireNonEmptyString(wake.phraseTrack, "wake.phraseTrack")
+    },
+    startedAt: requireNonEmptyString(payload.startedAt, "startedAt")
+  };
 }
 
 export function sessionAccepted(sessionId: string) {

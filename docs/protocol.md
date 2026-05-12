@@ -45,7 +45,16 @@ After `session.accepted`, binary websocket messages contain raw 16 kHz mono sign
 ## Server Events
 
 ```json
-{ "type": "session.accepted", "sessionId": "session-001", "maxSessionSeconds": 60 }
+{
+  "type": "session.accepted",
+  "sessionId": "session-001",
+  "maxSessionSeconds": 60,
+  "acceptedAudio": {
+    "format": "pcm_s16le",
+    "sampleRateHz": 16000,
+    "channels": 1
+  }
+}
 ```
 
 ```json

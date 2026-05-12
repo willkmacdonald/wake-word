@@ -78,16 +78,45 @@ class ServerMessage:
     message: str | None = None
 
 
+def _require_string(payload: dict[str, object], key: str) -> str:
+    value = payload.get(key)
+    if not isinstance(value, str) or len(value) == 0:
+        raise ValueError(f"{key} is required")
+    return value
+
+
+def _require_int(payload: dict[str, object], key: str) -> int:
+    value = payload.get(key)
+    if not isinstance(value, int):
+        raise ValueError(f"{key} is required")
+    return value
+
+
 def parse_server_message(raw: str) -> ServerMessage:
     payload = json.loads(raw)
     if not isinstance(payload, dict):
         raise ValueError("server message must be a JSON object")
 
-    return ServerMessage(
-        type=str(payload["type"]),
-        session_id=payload.get("sessionId"),
-        text=payload.get("text"),
-        offset_ms=payload.get("offsetMs"),
-        reason=payload.get("reason"),
-        message=payload.get("message"),
-    )
+    message_type = _require_string(payload, "type")
+    if message_type in {"transcript.partial", "transcript.final"}:
+        return ServerMessage(
+            type=message_type,
+            session_id=_require_string(payload, "sessionId"),
+            text=_require_string(payload, "text"),
+            offset_ms=_require_int(payload, "offsetMs"),
+        )
+    if message_type == "session.accepted":
+        return ServerMessage(
+            type=message_type,
+            session_id=_require_string(payload, "sessionId"),
+        )
+    if message_type == "session.ended":
+        return ServerMessage(
+            type=message_type,
+            session_id=_require_string(payload, "sessionId"),
+            reason=_require_string(payload, "reason"),
+        )
+    if message_type == "error":
+        return ServerMessage(type=message_type, message=_require_string(payload, "message"))
+
+    raise ValueError(f"unsupported server message type: {message_type}")
