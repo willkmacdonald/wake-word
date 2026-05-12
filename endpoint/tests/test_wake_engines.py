@@ -1,6 +1,7 @@
 from wake_word_endpoint.audio import AudioFrame
 from wake_word_endpoint.wake_engines.fake import FakeWakeEngine
 from wake_word_endpoint.wake_engines.openwakeword import OpenWakeWordEngine
+from wake_word_endpoint.wake_engines.porcupine import PorcupineEngine
 
 
 def test_fake_wake_engine_triggers_after_configured_frame_count():
@@ -41,3 +42,32 @@ def test_openwakeword_adapter_triggers_above_threshold():
     assert event is not None
     assert event.engine == "openwakeword"
     assert event.confidence == 0.9
+
+
+class FakePorcupine:
+    sample_rate = 16000
+    frame_length = 512
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def process(self, pcm):
+        self.calls += 1
+        return 0 if self.calls == 2 else -1
+
+
+def test_porcupine_adapter_triggers_on_keyword_index():
+    engine = PorcupineEngine(
+        porcupine=FakePorcupine(),
+        keyword_names=["hey_or_assistant"],
+        phrase_track="surgical-domain",
+    )
+    frame = AudioFrame.pcm_silence(sample_rate_hz=16000, channels=1, duration_ms=32)
+
+    assert engine.process(frame) is None
+    event = engine.process(frame)
+
+    assert event is not None
+    assert event.engine == "porcupine"
+    assert event.phrase_track == "surgical-domain"
+    assert event.confidence == 1.0

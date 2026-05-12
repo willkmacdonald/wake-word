@@ -18,3 +18,26 @@ Download the pre-trained models once on each evaluation machine before using
 ```bash
 python -c "import openwakeword; openwakeword.utils.download_models()"
 ```
+
+## Porcupine Track
+
+Porcupine is the first commercial embedded-oriented candidate. Evaluate:
+
+- built-in keyword quality
+- custom phrase workflow
+- license fit
+- Raspberry Pi 5 CPU and memory
+- whether access keys and model files can be managed cleanly
+
+Install with:
+
+```bash
+python -m pip install -e ".[porcupine]"
+```
+
+Provide the access key with an environment variable:
+
+```bash
+read -r -s PICOVOICE_ACCESS_KEY
+export PICOVOICE_ACCESS_KEY
+```
