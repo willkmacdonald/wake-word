@@ -20,6 +20,9 @@ From the repository root:
 uv pip install -e ".[sherpa]"
 ```
 
+The `sherpa` extra includes `sentencepiece` and `pypinyin`, which are imported
+by the `sherpa-onnx-cli text2token` command during keyword tokenization.
+
 ## Download English KWS Model
 
 Use the English GigaSpeech keyword spotting model first:
@@ -45,15 +48,17 @@ Sherpa keyword spotting uses tokenized keyword lines. The text form can include:
 
 - `:N.N` boosting score
 - `#N.N` trigger threshold
-- `@ORIGINAL PHRASE` label
+
+Sherpa also supports `@...` original-phrase labels, but omit them for this first
+test because labels containing spaces are easy to tokenize incorrectly.
 
 Create a raw keyword file:
 
 ```bash
 cat > /tmp/sherpa-keywords-raw.txt <<'EOF'
-HEY SENTINEL :2.0 #0.35 @HEY SENTINEL
-WAKE SENTINEL :2.0 #0.35 @WAKE SENTINEL
-HEY COMPUTER :2.0 #0.35 @HEY COMPUTER
+HEY SENTINEL :2.0 #0.35
+WAKE SENTINEL :2.0 #0.35
+HEY COMPUTER :2.0 #0.35
 EOF
 ```
 
@@ -65,6 +70,7 @@ MODEL_DIR="models/sherpa-onnx/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-
 uv run sherpa-onnx-cli text2token \
   --tokens "$MODEL_DIR/tokens.txt" \
   --tokens-type bpe \
+  --bpe-model "$MODEL_DIR/bpe.model" \
   /tmp/sherpa-keywords-raw.txt \
   /tmp/sherpa-keywords.txt
 ```

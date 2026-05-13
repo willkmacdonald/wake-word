@@ -6,6 +6,7 @@ __pycache__/
 *.pyc
 *.wav
 *.log
+models/
 node_modules/
 dist/
 coverage/

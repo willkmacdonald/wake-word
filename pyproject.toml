@@ -30,6 +30,8 @@ porcupine = [
   "pvporcupine>=3.0.0",
 ]
 sherpa = [
+  "pypinyin>=0.53.0",
+  "sentencepiece>=0.2.0",
   "sherpa-onnx>=1.12.0",
 ]
 
