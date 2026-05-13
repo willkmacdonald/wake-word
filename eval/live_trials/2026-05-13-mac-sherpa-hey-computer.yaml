@@ -1,0 +1,9 @@
+run_id: mac-sherpa-hey-computer-2026-05-13
+endpoint_type: mac-studio
+microphone: usb-mic-front-desk
+wake_engine: sherpa-onnx
+phrase_track: hey-computer-gigaspeech-boosted
+false_accepts: 0
+missed_detections: 11
+trigger_to_first_transcript_ms: null
+notes: "Observed live on May 13, 2026 with local mock gateway and real Mac Studio microphone. Initial mixed-keyword file only responded to Hey Computer, not Hey Sentinel or Wake Sentinel. Focused Hey Computer tuning at boosting 3.0 and threshold 0.25 passed a 30 second idle false-positive test and triggered in roughly 2, 1, 2, and 4 attempts across spoken runs when waiting about 2 seconds after command startup. More aggressive boosting 4.0 and threshold 0.20 also passed idle, but still needed about 2 and 3 attempts. No false accepts were observed. Best current non-gated local candidate, but detection remains inconsistent."

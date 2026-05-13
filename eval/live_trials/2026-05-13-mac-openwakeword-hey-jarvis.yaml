@@ -1,0 +1,9 @@
+run_id: mac-openwakeword-hey-jarvis-2026-05-13
+endpoint_type: mac-studio
+microphone: usb-mic-front-desk
+wake_engine: openwakeword
+phrase_track: builtin-hey-jarvis
+false_accepts: 0
+missed_detections: 15
+trigger_to_first_transcript_ms: null
+notes: "Observed live on May 13, 2026 with local mock gateway and real Mac Studio microphone. Baseline runs eventually triggered on Hey Jarvis, but usually required repeated phrases: approximately 5, 2, 2, 3, 3, and 3 attempts. Separating Hey ... Jarvis worsened to about 4 attempts. No false accepts were observed. Integration passed, but first-utterance responsiveness was weak."

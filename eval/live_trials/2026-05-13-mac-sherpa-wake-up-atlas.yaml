@@ -1,0 +1,9 @@
+run_id: mac-sherpa-wake-up-atlas-2026-05-13
+endpoint_type: mac-studio
+microphone: usb-mic-front-desk
+wake_engine: sherpa-onnx
+phrase_track: wake-up-atlas-gigaspeech
+false_accepts: 0
+missed_detections: 8
+trigger_to_first_transcript_ms: null
+notes: "Observed live on May 13, 2026 with local mock gateway and real Mac Studio microphone. Wake Up Atlas at boosting 3.0 and threshold 0.25 triggered once on the Wake portion of a second attempt, once after about 3 attempts with a delayed response, and later produced two no-detect runs plus one delayed trigger around 6 seconds. No false accepts were observed. Overall less reliable than Hey Computer."
