@@ -54,11 +54,16 @@ class MicrophoneAudioSource:
         sample_rate_hz: int,
         channels: int,
         frame_duration_ms: int,
+        overflow_policy: str = "skip",
     ) -> None:
+        if overflow_policy not in {"skip", "raise"}:
+            raise ValueError("overflow_policy must be 'skip' or 'raise'")
         self.device = device
         self.sample_rate_hz = sample_rate_hz
         self.channels = channels
         self.frame_duration_ms = frame_duration_ms
+        self.overflow_policy = overflow_policy
+        self.overflow_count = 0
 
     def frames(self, max_frames: int | None = None) -> Iterator[AudioFrame]:
         import sounddevice as sd
@@ -75,7 +80,10 @@ class MicrophoneAudioSource:
             while max_frames is None or emitted < max_frames:
                 data, overflowed = stream.read(frame_samples)
                 if overflowed:
-                    raise RuntimeError("microphone input overflowed")
+                    self.overflow_count += 1
+                    if self.overflow_policy == "raise":
+                        raise RuntimeError("microphone input overflowed")
+                    continue
                 emitted += 1
                 yield AudioFrame(
                     pcm=bytes(data),
