@@ -66,6 +66,7 @@ Implemented:
 - Azure Speech adapter and Container Apps deployment files
 - Raspberry Pi 5 bring-up docs and audio check script
 - OpenWakeWord and Porcupine adapter wrappers
+- Sherpa-ONNX local keyword spotting adapter
 - live-trial observational report format
 - gateway retry policy, negative protocol tests, Pi audio profiling, and basic gateway metrics
 - gateway fail-closed token config, endpoint allow-list, and session duration/idle limits

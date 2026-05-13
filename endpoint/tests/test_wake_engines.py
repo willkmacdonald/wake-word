@@ -4,6 +4,7 @@ from wake_word_endpoint.audio import AudioFrame
 from wake_word_endpoint.wake_engines.fake import FakeWakeEngine
 from wake_word_endpoint.wake_engines.openwakeword import OpenWakeWordEngine
 from wake_word_endpoint.wake_engines.porcupine import PorcupineEngine
+from wake_word_endpoint.wake_engines.sherpa_onnx import SherpaOnnxKeywordEngine
 
 
 def test_fake_wake_engine_triggers_after_configured_frame_count():
@@ -44,6 +45,68 @@ def test_openwakeword_adapter_triggers_above_threshold():
     assert event is not None
     assert event.engine == "openwakeword"
     assert event.confidence == 0.9
+
+
+class FakeSherpaStream:
+    def __init__(self) -> None:
+        self.accepted_sample_rate = None
+        self.accepted_samples = None
+
+    def accept_waveform(self, sample_rate, samples):
+        self.accepted_sample_rate = sample_rate
+        self.accepted_samples = samples
+
+
+class FakeSherpaSpotter:
+    def __init__(self) -> None:
+        self.stream = FakeSherpaStream()
+        self.ready_calls = 0
+        self.decoded = False
+        self.reset_called = False
+
+    def create_stream(self):
+        return self.stream
+
+    def is_ready(self, stream):
+        assert stream is self.stream
+        self.ready_calls += 1
+        return self.ready_calls == 1
+
+    def decode_stream(self, stream):
+        assert stream is self.stream
+        self.decoded = True
+
+    def get_result(self, stream):
+        assert stream is self.stream
+        return "HEY SENTINEL" if self.decoded else ""
+
+    def reset_stream(self, stream):
+        assert stream is self.stream
+        self.reset_called = True
+
+
+def test_sherpa_onnx_adapter_streams_float_audio_and_triggers():
+    spotter = FakeSherpaSpotter()
+    engine = SherpaOnnxKeywordEngine(
+        spotter=spotter,
+        phrase_track="sherpa-baseline",
+    )
+    pcm = np.array([0, 32767, -32768], dtype=np.int16).tobytes()
+    frame = AudioFrame(pcm=pcm, sample_rate_hz=16000, channels=1, duration_ms=20)
+
+    event = engine.process(frame)
+
+    assert event is not None
+    assert event.engine == "sherpa-onnx"
+    assert event.phrase_track == "sherpa-baseline"
+    assert event.confidence == 1.0
+    assert event.frame_index == 1
+    assert spotter.stream.accepted_sample_rate == 16000
+    np.testing.assert_allclose(
+        spotter.stream.accepted_samples,
+        np.array([0.0, 32767 / 32768, -1.0], dtype=np.float32),
+    )
+    assert spotter.reset_called is True
 
 
 class FakePorcupine:

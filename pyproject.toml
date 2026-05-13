@@ -29,6 +29,9 @@ openwakeword = [
 porcupine = [
   "pvporcupine>=3.0.0",
 ]
+sherpa = [
+  "sherpa-onnx>=1.12.0",
+]
 
 [project.scripts]
 wake-endpoint = "wake_word_endpoint.cli:app"

@@ -50,6 +50,16 @@ Porcupine requires 16 kHz mono frames with exactly `porcupine.frame_length`
 samples. Configure endpoint frame duration to match the selected Porcupine engine
 or add a reframing buffer before using this adapter.
 
+## Sherpa-ONNX Track
+
+Sherpa-ONNX is the current no-account local keyword spotting candidate. It runs
+offline and supports open-vocabulary keyword spotting without training a custom
+model.
+
+Use `engine: sherpa-onnx` and provide a downloaded model directory plus a
+tokenized keywords file at runtime. See `docs/sherpa-onnx.md` for setup and
+trial commands.
+
 ## Live Trial Protocol
 
 For each run:

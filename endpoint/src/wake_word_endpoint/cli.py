@@ -113,6 +113,10 @@ def build_wake_engine(
     openwakeword_threshold: float = 0.5,
     porcupine_keyword: str = "picovoice",
     porcupine_access_key_env: str = "PORCUPINE_ACCESS_KEY",
+    sherpa_model_dir: str | None = None,
+    sherpa_keywords_file: str | None = None,
+    sherpa_num_threads: int = 2,
+    sherpa_provider: str = "cpu",
 ):
     """Build the configured wake engine without importing optional SDKs unless needed."""
     normalized = engine.strip().lower()
@@ -135,6 +139,22 @@ def build_wake_engine(
             keywords=[porcupine_keyword],
             phrase_track=phrase_track,
         )
+    if normalized == "sherpa-onnx":
+        from wake_word_endpoint.wake_engines.sherpa_onnx import SherpaOnnxKeywordEngine
+
+        if not sherpa_model_dir:
+            raise ValueError("--sherpa-model-dir is required when wake_word.engine is sherpa-onnx")
+        if not sherpa_keywords_file:
+            raise ValueError(
+                "--sherpa-keywords-file is required when wake_word.engine is sherpa-onnx"
+            )
+        return SherpaOnnxKeywordEngine.from_model_dir(
+            model_dir=sherpa_model_dir,
+            keywords_file=sherpa_keywords_file,
+            phrase_track=phrase_track,
+            num_threads=sherpa_num_threads,
+            provider=sherpa_provider,
+        )
     raise ValueError(f"unsupported wake-word engine: {engine}")
 
 
@@ -147,6 +167,10 @@ def run(
     openwakeword_threshold: float = 0.5,
     porcupine_keyword: str = "picovoice",
     porcupine_access_key_env: str = "PORCUPINE_ACCESS_KEY",
+    sherpa_model_dir: str | None = None,
+    sherpa_keywords_file: str | None = None,
+    sherpa_num_threads: int = 2,
+    sherpa_provider: str = "cpu",
 ) -> None:
     """Run the microphone endpoint with the wake engine selected in config."""
     loaded = load_config(config)
@@ -164,6 +188,10 @@ def run(
         openwakeword_threshold=openwakeword_threshold,
         porcupine_keyword=porcupine_keyword,
         porcupine_access_key_env=porcupine_access_key_env,
+        sherpa_model_dir=sherpa_model_dir,
+        sherpa_keywords_file=sherpa_keywords_file,
+        sherpa_num_threads=sherpa_num_threads,
+        sherpa_provider=sherpa_provider,
     )
     gateway = GatewayClient(
         url=loaded.gateway.url,
