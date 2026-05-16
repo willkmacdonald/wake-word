@@ -12,6 +12,7 @@ from wake_word_endpoint.audio import GeneratedAudioSource, MicrophoneAudioSource
 from wake_word_endpoint.config import load_config
 from wake_word_endpoint.controller import EndpointController
 from wake_word_endpoint.gateway_client import GatewayClient
+from wake_word_endpoint.wake_engines.base import WakeDetection
 from wake_word_endpoint.wake_engines.fake import FakeWakeEngine
 
 app = typer.Typer(no_args_is_help=True)
@@ -103,6 +104,18 @@ def _gateway_token(token_env: str) -> str:
     if not token:
         raise RuntimeError(f"{token_env} is not set")
     return token
+
+
+def _print_detection(detection: WakeDetection) -> None:
+    print(
+        {
+            "type": "wake.detected",
+            "engine": detection.engine,
+            "phrase_track": detection.phrase_track,
+            "frame_index": detection.frame_index,
+            "confidence": detection.confidence,
+        }
+    )
 
 
 def build_wake_engine(
@@ -235,6 +248,7 @@ def run(
             loaded.session.max_seconds,
             loaded.session.frame_duration_ms,
         ),
+        on_detection=_print_detection,
     )
     max_listen_frames = (
         None

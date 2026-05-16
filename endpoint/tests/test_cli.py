@@ -93,6 +93,7 @@ def test_run_builds_microphone_endpoint_from_config(monkeypatch, tmp_path: Path)
     assert controller["run_id"] == "live-run"
     assert controller["audio_source"] is not None
     assert controller["wake_engine"] == "fake-engine"
+    assert callable(controller["on_detection"])
     assert controller["max_stream_frames"] == 3000
     assert created["max_listen_frames"] == 100
     assert "live-event" in result.output

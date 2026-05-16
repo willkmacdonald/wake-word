@@ -102,3 +102,7 @@ Use the same live-trial routine as the Sherpa tests:
 2. Say `Hey Sentinel` once.
 3. If it does not trigger, wait five seconds and repeat.
 4. Record attempts, delayed triggers, and any idle false accepts.
+
+Use the `wake.detected` line for wake timing. The `ServerMessage(...)` lines are
+printed after the post-trigger audio stream finishes, so they include the
+configured `session.max_seconds` delay.

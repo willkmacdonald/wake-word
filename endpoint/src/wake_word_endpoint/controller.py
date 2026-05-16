@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from typing import Any
 
 from wake_word_endpoint.audio import AudioFrame, AudioSource
 from wake_word_endpoint.protocol import AudioSpec, SessionHello, WakeSpec
-from wake_word_endpoint.wake_engines.base import WakeEngine
+from wake_word_endpoint.wake_engines.base import WakeDetection, WakeEngine
 
 
 async def _async_frames(
@@ -32,6 +32,7 @@ class EndpointController:
         channels: int,
         frame_duration_ms: int,
         max_stream_frames: int,
+        on_detection: Callable[[WakeDetection], None] | None = None,
     ) -> None:
         self.endpoint_id = endpoint_id
         self.endpoint_type = endpoint_type
@@ -43,6 +44,7 @@ class EndpointController:
         self.channels = channels
         self.frame_duration_ms = frame_duration_ms
         self.max_stream_frames = max_stream_frames
+        self.on_detection = on_detection
 
     async def run_once(self, max_listen_frames: int | None = None) -> list[Any]:
         source_iter = self.audio_source.frames()
@@ -56,6 +58,8 @@ class EndpointController:
             detection = self.wake_engine.process(frame)
             if detection is None:
                 continue
+            if self.on_detection is not None:
+                self.on_detection(detection)
 
             hello = SessionHello(
                 endpoint_id=self.endpoint_id,

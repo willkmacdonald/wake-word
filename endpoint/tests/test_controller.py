@@ -58,3 +58,35 @@ def test_controller_streams_only_after_wake_detection():
     assert gateway.entry_yielded_count == 3
     assert gateway.streamed_frames == 5
     assert gateway.streamed_markers == [4, 5, 6, 7, 8]
+
+
+def test_controller_notifies_detection_before_streaming():
+    source = TrackingAudioSource()
+    engine = FakeWakeEngine(trigger_after_frames=3)
+    gateway = RecordingGateway(source)
+    events: list[str] = []
+
+    async def recording_stream_session(hello, frames, stop_reason="manual"):
+        events.append("stream-started")
+        async for _frame in frames:
+            pass
+        return []
+
+    gateway.stream_session = recording_stream_session
+    controller = EndpointController(
+        endpoint_id="mac-studio-01",
+        endpoint_type="mac-studio",
+        run_id="run-001",
+        audio_source=source,
+        wake_engine=engine,
+        gateway_client=gateway,
+        sample_rate_hz=16000,
+        channels=1,
+        frame_duration_ms=20,
+        max_stream_frames=5,
+        on_detection=lambda detection: events.append(f"detected:{detection.frame_index}"),
+    )
+
+    asyncio.run(controller.run_once(max_listen_frames=3))
+
+    assert events == ["detected:3", "stream-started"]
