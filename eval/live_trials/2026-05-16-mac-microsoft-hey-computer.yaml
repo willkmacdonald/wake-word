@@ -1,0 +1,9 @@
+run_id: mac-microsoft-hey-computer-2026-05-16
+endpoint_type: mac-studio
+microphone: usb-mic-front-desk
+wake_engine: microsoft-custom-keyword
+phrase_track: custom-hey-computer
+false_accepts: 0
+missed_detections: 0
+trigger_to_first_transcript_ms: 7000
+notes: "Observed live on May 16, 2026 with local mock gateway, real Mac Studio microphone, and Microsoft Custom Keyword .table model. Four spoken trials all detected immediately on the first Hey Computer attempt. User-visible ServerMessage response appeared around the 7 second mark, which is consistent with the current 5 second post-trigger stream window plus overhead rather than wake-detection latency. No false accepts were reported during these spoken trials."
