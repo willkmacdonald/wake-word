@@ -74,10 +74,11 @@ include the other extras so the previously tested engines stay available:
 uv sync --extra dev --extra microsoft-keyword --extra sherpa --extra openwakeword --extra porcupine
 ```
 
-Use the checked-in Mac example:
+Use the checked-in Mac example for the model you want to test:
 
 ```bash
 endpoint/configs/mac.microsoft-custom-keyword.example.yaml
+endpoint/configs/mac.microsoft-hey-computer.example.yaml
 ```
 
 Start the local mock gateway in one terminal:
@@ -86,7 +87,7 @@ Start the local mock gateway in one terminal:
 GATEWAY_DEVICE_TOKEN=dev-token TRANSCRIPTION_MODE=mock npm run dev
 ```
 
-Run the endpoint in a second terminal:
+Run the `Hey Sentinel` endpoint in a second terminal:
 
 ```bash
 GATEWAY_DEVICE_TOKEN=dev-token \
@@ -96,10 +97,20 @@ uv run wake-endpoint run endpoint/configs/mac.microsoft-custom-keyword.example.y
   --microsoft-keyword-table models/microsoft-custom-keyword/hey-sentinel.table
 ```
 
+Or run the `Hey Computer` endpoint:
+
+```bash
+GATEWAY_DEVICE_TOKEN=dev-token \
+uv run wake-endpoint run endpoint/configs/mac.microsoft-hey-computer.example.yaml \
+  --run-id mac-microsoft-hey-computer-001 \
+  --max-listen-seconds 30 \
+  --microsoft-keyword-table models/microsoft-custom-keyword/hey-computer.table
+```
+
 Use the same live-trial routine as the Sherpa tests:
 
 1. Wait about two seconds after pressing enter.
-2. Say `Hey Sentinel` once.
+2. Say the configured phrase once.
 3. If it does not trigger, wait five seconds and repeat.
 4. Record attempts, delayed triggers, and any idle false accepts.
 
