@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from wake_word_endpoint.audio import AudioFrame
 from wake_word_endpoint.wake_engines.fake import FakeWakeEngine
+from wake_word_endpoint.wake_engines.microsoft_custom_keyword import MicrosoftCustomKeywordEngine
 from wake_word_endpoint.wake_engines.openwakeword import OpenWakeWordEngine
 from wake_word_endpoint.wake_engines.porcupine import PorcupineEngine
 from wake_word_endpoint.wake_engines.sherpa_onnx import SherpaOnnxKeywordEngine
@@ -107,6 +108,78 @@ def test_sherpa_onnx_adapter_streams_float_audio_and_triggers():
         np.array([0.0, 32767 / 32768, -1.0], dtype=np.float32),
     )
     assert spotter.reset_called is True
+
+
+class FakeSignal:
+    def __init__(self) -> None:
+        self.callbacks = []
+
+    def connect(self, callback):
+        self.callbacks.append(callback)
+
+    def emit(self, event=None):
+        for callback in self.callbacks:
+            callback(event)
+
+
+class FakeMicrosoftRecognizer:
+    def __init__(self) -> None:
+        self.recognized = FakeSignal()
+        self.canceled = FakeSignal()
+        self.started_model = None
+
+    def recognize_once_async(self, model):
+        self.started_model = model
+        return object()
+
+
+class FakePushStream:
+    def __init__(self) -> None:
+        self.writes: list[bytes] = []
+
+    def write(self, buffer: bytes) -> None:
+        self.writes.append(buffer)
+
+
+def test_microsoft_custom_keyword_adapter_pushes_pcm_and_returns_callback_detection():
+    recognizer = FakeMicrosoftRecognizer()
+    stream = FakePushStream()
+    engine = MicrosoftCustomKeywordEngine(
+        keyword_model="keyword-model",
+        recognizer=recognizer,
+        push_stream=stream,
+        phrase_track="custom-hey-sentinel",
+        sample_rate_hz=16000,
+        channels=1,
+    )
+    frame = AudioFrame.pcm_silence(sample_rate_hz=16000, channels=1, duration_ms=20)
+
+    assert recognizer.started_model == "keyword-model"
+    assert engine.process(frame) is None
+    recognizer.recognized.emit()
+    event = engine.process(frame)
+
+    assert stream.writes == [frame.pcm, frame.pcm]
+    assert event is not None
+    assert event.engine == "microsoft-custom-keyword"
+    assert event.phrase_track == "custom-hey-sentinel"
+    assert event.confidence == 1.0
+    assert event.frame_index == 2
+
+
+def test_microsoft_custom_keyword_adapter_rejects_audio_format_mismatch():
+    engine = MicrosoftCustomKeywordEngine(
+        keyword_model="keyword-model",
+        recognizer=FakeMicrosoftRecognizer(),
+        push_stream=FakePushStream(),
+        phrase_track="custom-hey-sentinel",
+        sample_rate_hz=16000,
+        channels=1,
+    )
+    frame = AudioFrame.pcm_silence(sample_rate_hz=48000, channels=1, duration_ms=20)
+
+    with pytest.raises(ValueError, match="16000 Hz"):
+        engine.process(frame)
 
 
 class FakePorcupine:

@@ -113,6 +113,9 @@ def build_wake_engine(
     openwakeword_threshold: float = 0.5,
     porcupine_keyword: str = "picovoice",
     porcupine_access_key_env: str = "PORCUPINE_ACCESS_KEY",
+    microsoft_keyword_table: str | None = None,
+    microsoft_sample_rate_hz: int = 16000,
+    microsoft_channels: int = 1,
     sherpa_model_dir: str | None = None,
     sherpa_keywords_file: str | None = None,
     sherpa_num_threads: int = 2,
@@ -138,6 +141,22 @@ def build_wake_engine(
             access_key=access_key,
             keywords=[porcupine_keyword],
             phrase_track=phrase_track,
+        )
+    if normalized == "microsoft-custom-keyword":
+        from wake_word_endpoint.wake_engines.microsoft_custom_keyword import (
+            MicrosoftCustomKeywordEngine,
+        )
+
+        if not microsoft_keyword_table:
+            raise ValueError(
+                "--microsoft-keyword-table is required when "
+                "wake_word.engine is microsoft-custom-keyword"
+            )
+        return MicrosoftCustomKeywordEngine.from_table_file(
+            table_file=microsoft_keyword_table,
+            phrase_track=phrase_track,
+            sample_rate_hz=microsoft_sample_rate_hz,
+            channels=microsoft_channels,
         )
     if normalized == "sherpa-onnx":
         from wake_word_endpoint.wake_engines.sherpa_onnx import SherpaOnnxKeywordEngine
@@ -167,6 +186,7 @@ def run(
     openwakeword_threshold: float = 0.5,
     porcupine_keyword: str = "picovoice",
     porcupine_access_key_env: str = "PORCUPINE_ACCESS_KEY",
+    microsoft_keyword_table: str | None = None,
     sherpa_model_dir: str | None = None,
     sherpa_keywords_file: str | None = None,
     sherpa_num_threads: int = 2,
@@ -188,6 +208,9 @@ def run(
         openwakeword_threshold=openwakeword_threshold,
         porcupine_keyword=porcupine_keyword,
         porcupine_access_key_env=porcupine_access_key_env,
+        microsoft_keyword_table=microsoft_keyword_table,
+        microsoft_sample_rate_hz=loaded.microphone.sample_rate_hz,
+        microsoft_channels=loaded.microphone.channels,
         sherpa_model_dir=sherpa_model_dir,
         sherpa_keywords_file=sherpa_keywords_file,
         sherpa_num_threads=sherpa_num_threads,

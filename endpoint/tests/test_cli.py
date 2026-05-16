@@ -166,8 +166,76 @@ def test_run_passes_sherpa_onnx_options_to_engine_builder(monkeypatch, tmp_path:
         "openwakeword_threshold": 0.5,
         "porcupine_keyword": "picovoice",
         "porcupine_access_key_env": "PORCUPINE_ACCESS_KEY",
+        "microsoft_keyword_table": None,
+        "microsoft_sample_rate_hz": 16000,
+        "microsoft_channels": 1,
         "sherpa_model_dir": "/models/kws",
         "sherpa_keywords_file": "/models/kws/keywords.txt",
         "sherpa_num_threads": 4,
+        "sherpa_provider": "cpu",
+    }
+
+
+def test_run_passes_microsoft_custom_keyword_options_to_engine_builder(monkeypatch, tmp_path: Path):
+    config_path = tmp_path / "config.yaml"
+    write_config(config_path)
+    config_path.write_text(
+        config_path.read_text()
+        .replace("engine: fake", "engine: microsoft-custom-keyword")
+        .replace("phrase_track: builtin-baseline", "phrase_track: custom-hey-sentinel")
+    )
+    created: dict[str, object] = {}
+
+    class RecordingSource:
+        def __init__(self, **_kwargs):
+            pass
+
+    class RecordingGateway:
+        def __init__(self, **_kwargs):
+            pass
+
+    class RecordingController:
+        def __init__(self, **kwargs):
+            created["controller"] = kwargs
+
+        async def run_once(self, max_listen_frames=None):
+            return []
+
+    def recording_engine_builder(engine, phrase_track, **kwargs):
+        created["engine"] = engine
+        created["phrase_track"] = phrase_track
+        created["engine_kwargs"] = kwargs
+        return "microsoft-engine"
+
+    monkeypatch.setenv("GATEWAY_DEVICE_TOKEN", "secret-token")
+    monkeypatch.setattr(cli, "MicrophoneAudioSource", RecordingSource)
+    monkeypatch.setattr(cli, "GatewayClient", RecordingGateway)
+    monkeypatch.setattr(cli, "EndpointController", RecordingController)
+    monkeypatch.setattr(cli, "build_wake_engine", recording_engine_builder)
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "run",
+            str(config_path),
+            "--microsoft-keyword-table",
+            "/models/microsoft-custom-keyword/hey-sentinel.table",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert created["engine"] == "microsoft-custom-keyword"
+    assert created["phrase_track"] == "custom-hey-sentinel"
+    assert created["engine_kwargs"] == {
+        "openwakeword_model": "hey_jarvis",
+        "openwakeword_threshold": 0.5,
+        "porcupine_keyword": "picovoice",
+        "porcupine_access_key_env": "PORCUPINE_ACCESS_KEY",
+        "microsoft_keyword_table": "/models/microsoft-custom-keyword/hey-sentinel.table",
+        "microsoft_sample_rate_hz": 16000,
+        "microsoft_channels": 1,
+        "sherpa_model_dir": None,
+        "sherpa_keywords_file": None,
+        "sherpa_num_threads": 2,
         "sherpa_provider": "cpu",
     }

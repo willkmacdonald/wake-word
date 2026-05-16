@@ -1,0 +1,16 @@
+endpoint:
+  id: mac-studio-01
+  type: mac-studio
+microphone:
+  device: null
+  sample_rate_hz: 16000
+  channels: 1
+wake_word:
+  engine: microsoft-custom-keyword
+  phrase_track: custom-hey-sentinel
+gateway:
+  url: ws://localhost:8080/v1/audio
+  token_env: GATEWAY_DEVICE_TOKEN
+session:
+  frame_duration_ms: 20
+  max_seconds: 5

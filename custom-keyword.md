@@ -64,3 +64,41 @@ cp /path/to/downloaded-model.table /Users/willmacdonald/Documents/Code/claude/wa
 
 The `.table` file is the artifact the local Microsoft Speech SDK keyword
 recognizer will use for on-device wake-word detection.
+
+## Run Local Trial
+
+Install the optional Microsoft Speech SDK dependency. In this dev workspace,
+include the other extras so the previously tested engines stay available:
+
+```bash
+uv sync --extra dev --extra microsoft-keyword --extra sherpa --extra openwakeword --extra porcupine
+```
+
+Use the checked-in Mac example:
+
+```bash
+endpoint/configs/mac.microsoft-custom-keyword.example.yaml
+```
+
+Start the local mock gateway in one terminal:
+
+```bash
+GATEWAY_DEVICE_TOKEN=dev-token TRANSCRIPTION_MODE=mock npm run dev
+```
+
+Run the endpoint in a second terminal:
+
+```bash
+GATEWAY_DEVICE_TOKEN=dev-token \
+uv run wake-endpoint run endpoint/configs/mac.microsoft-custom-keyword.example.yaml \
+  --run-id mac-microsoft-hey-sentinel-001 \
+  --max-listen-seconds 30 \
+  --microsoft-keyword-table models/microsoft-custom-keyword/hey-sentinel.table
+```
+
+Use the same live-trial routine as the Sherpa tests:
+
+1. Wait about two seconds after pressing enter.
+2. Say `Hey Sentinel` once.
+3. If it does not trigger, wait five seconds and repeat.
+4. Record attempts, delayed triggers, and any idle false accepts.
