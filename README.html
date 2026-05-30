@@ -704,18 +704,19 @@
       </div>
     </section>
 
-    <!-- §03 Wake engines -->
+    <!-- §03 Wake engine -->
     <section>
       <div class="section-head">
         <div class="sym">§ 03</div>
-        <h2>Wake engines, <em>swappable</em>.</h2>
+        <h2>Wake engine, <em>chosen</em>.</h2>
       </div>
       <div class="section-body">
         <div class="gutter">Tab. 1</div>
         <div class="content">
           <p>
-            Four interchangeable engines, selected via
-            <span class="file">wake_word.engine</span> in the endpoint config.
+            The endpoint runs <strong>Microsoft Azure custom keyword</strong>.
+            A <span class="file">fake</span> engine stays wired up for
+            deterministic smoke tests.
           </p>
           <div class="table-wrap">
             <table>
@@ -733,21 +734,6 @@
                   <td>Deterministic trigger for smoke tests.</td>
                 </tr>
                 <tr>
-                  <td>openwakeword</td>
-                  <td><code>pip install .[openwakeword]</code></td>
-                  <td>ONNX models — "Hey Jarvis" out of the box.</td>
-                </tr>
-                <tr>
-                  <td>porcupine</td>
-                  <td><code>pip install .[porcupine]</code></td>
-                  <td>Picovoice; access key required.</td>
-                </tr>
-                <tr>
-                  <td>sherpa</td>
-                  <td><code>pip install .[sherpa]</code></td>
-                  <td>Local keyword spotting; custom lists.</td>
-                </tr>
-                <tr>
                   <td>microsoft</td>
                   <td><code>pip install .[microsoft-keyword]</code></td>
                   <td>Azure custom keyword <span class="file">.table</span> models.</td>
@@ -755,6 +741,10 @@
               </tbody>
             </table>
           </div>
+          <p>
+            Set <span class="file">wake_word.engine</span> in the endpoint
+            config to pick between them.
+          </p>
         </div>
       </div>
     </section>
@@ -813,41 +803,35 @@ wake-endpoint run endpoint/configs/mac.example.yaml \
   --max-listen-seconds 30</div>
           <p>
             The example config uses the <span class="file">fake</span> engine
-            against live microphone capture. Swap
+            against live microphone capture. Switch
             <span class="file">wake_word.engine</span> to
-            <span class="file">openwakeword</span>,
-            <span class="file">porcupine</span>,
-            <span class="file">sherpa</span>, or
-            <span class="file">microsoft</span> after installing the matching
-            optional dependency. Each detection prints its <em>trigger
-            latency</em>.
+            <span class="file">microsoft</span> after installing
+            <span class="file">pip install .[microsoft-keyword]</span> to run
+            the real Azure custom keyword engine. Each detection prints its
+            <em>trigger latency</em>.
           </p>
         </div>
       </div>
     </section>
 
-    <!-- §06 Live trials -->
+    <!-- §06 Live trial -->
     <section>
       <div class="section-head">
         <div class="sym">§ 06</div>
-        <h2>Live <em>trials</em>.</h2>
+        <h2>Live <em>trial</em>.</h2>
       </div>
       <div class="section-body">
         <div class="gutter">Eval · YAML</div>
         <div class="content">
           <p>
-            Observational reports live under
-            <span class="file">eval/live_trials/</span>. The current set covers
-            four runs from May 2026:
+            The active observational report lives under
+            <span class="file">eval/live_trials/</span>:
           </p>
           <ul>
-            <li><strong>OpenWakeWord</strong> — "Hey Jarvis"</li>
-            <li><strong>Sherpa-ONNX</strong> — "Hey Computer"</li>
-            <li><strong>Sherpa-ONNX</strong> — "Wake Up Atlas"</li>
             <li><strong>Microsoft Azure custom keyword</strong> — "Hey Computer"</li>
           </ul>
           <p>
-            Render a summary with
+            Render the summary with
             <span class="file">wake-eval-report eval/live_trials/&lt;file&gt;.yaml</span>.
           </p>
         </div>
@@ -896,8 +880,8 @@ wake-endpoint run endpoint/configs/mac.example.yaml \
         </div>
         <div class="status-card">
           <div class="label">Built · 03</div>
-          <h3>Wake <em>engines</em></h3>
-          <p>OpenWakeWord, Porcupine, Sherpa-ONNX, and Microsoft custom keyword adapters. Detection latency printed per trigger.</p>
+          <h3>Wake <em>engine</em></h3>
+          <p>Microsoft Azure custom keyword adapter. Detection latency printed per trigger.</p>
         </div>
         <div class="status-card">
           <div class="label">Built · 04</div>
@@ -906,8 +890,8 @@ wake-endpoint run endpoint/configs/mac.example.yaml \
         </div>
         <div class="status-card">
           <div class="label">Built · 05</div>
-          <h3>Live-trial <em>reports</em></h3>
-          <p>Observational report format with four recorded runs across OpenWakeWord, Sherpa-ONNX, and Microsoft Azure.</p>
+          <h3>Live-trial <em>report</em></h3>
+          <p>Observational report format with one recorded run — Microsoft Azure custom keyword, "Hey Computer."</p>
         </div>
         <div class="status-card">
           <div class="label">Not yet · 06</div>

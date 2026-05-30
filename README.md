@@ -17,18 +17,17 @@ USB mic → Mac Studio or Raspberry Pi 5 endpoint → local wake-word detection
 - `eval/` — live-trial reporting for observational wake-word comparisons.
 - `docs/` — architecture, hardware, protocol, and evaluation notes.
 
-## Wake Engines
+## Wake Engine
 
-The endpoint ships with four interchangeable wake engines, selected via
-`wake_word.engine` in the endpoint config:
+The endpoint uses **Microsoft Azure custom keyword** for wake-word detection.
+A `fake` engine is also wired up for deterministic smoke tests.
 
-| Engine            | Install extra              | Notes                                          |
-|-------------------|----------------------------|------------------------------------------------|
-| `fake`            | none                       | Deterministic trigger for smoke tests          |
-| `openwakeword`    | `pip install .[openwakeword]` | ONNX models, "Hey Jarvis" out of the box   |
-| `porcupine`       | `pip install .[porcupine]` | Picovoice, requires access key                 |
-| `sherpa`          | `pip install .[sherpa]`    | Local keyword spotting, custom keyword lists   |
-| `microsoft`       | `pip install .[microsoft-keyword]` | Azure custom keyword `.table` models   |
+| Engine      | Install extra                       | Notes                                  |
+|-------------|-------------------------------------|----------------------------------------|
+| `fake`      | none                                | Deterministic trigger for smoke tests  |
+| `microsoft` | `pip install .[microsoft-keyword]`  | Azure custom keyword `.table` models   |
+
+Set `wake_word.engine` in the endpoint config to choose between them.
 
 ## First Milestone
 
@@ -72,21 +71,17 @@ wake-endpoint run endpoint/configs/mac.example.yaml \
 ```
 
 The example config uses the `fake` engine against live microphone capture.
-Change `wake_word.engine` to `openwakeword`, `porcupine`, `sherpa`, or
-`microsoft` after installing the matching optional dependency to test real
-wake-word engines. Each detection prints its trigger latency.
+Switch `wake_word.engine` to `microsoft` after installing
+`pip install .[microsoft-keyword]` to run the real Azure custom keyword
+engine. Each detection prints its trigger latency.
 
-## Live Wake-Word Trials
+## Live Wake-Word Trial
 
-Observational reports for each engine live under `eval/live_trials/`. The
-current set covers four runs from May 2026:
+The active wake-word trial lives under `eval/live_trials/`:
 
-- OpenWakeWord — "Hey Jarvis"
-- Sherpa-ONNX — "Hey Computer"
-- Sherpa-ONNX — "Wake Up Atlas"
 - Microsoft Azure custom keyword — "Hey Computer"
 
-Render a trial summary with `wake-eval-report eval/live_trials/<file>.yaml`.
+Render the summary with `wake-eval-report eval/live_trials/<file>.yaml`.
 
 ## Milestone 1 Status
 
@@ -98,8 +93,8 @@ Implemented:
 - TypeScript gateway websocket server with auth and mock transcription
 - Azure Speech adapter and Container Apps deployment files
 - Raspberry Pi 5 bring-up docs and audio check script
-- OpenWakeWord, Porcupine, Sherpa-ONNX, and Microsoft custom keyword adapters
-- live-trial observational report format with four recorded runs
+- Microsoft Azure custom keyword adapter
+- live-trial observational report format with one recorded run
 - gateway retry policy, negative protocol tests, Pi audio profiling, basic
   gateway metrics
 - gateway fail-closed token config, endpoint allow-list, and session
@@ -113,7 +108,7 @@ Verified on May 16, 2026:
 - local fake endpoint to mock gateway smoke test
 - Mac microphone probe when USB mic is attached
 - gateway `/healthz` and `/metrics` when running locally
-- four live wake-word trials on Mac Studio
+- live Microsoft Azure custom keyword trial on Mac Studio
 
 Not yet verified:
 
