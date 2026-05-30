@@ -1,0 +1,932 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wake-Word Endpoint — Will Macdonald</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --paper: #FAF7F2;
+      --paper-tint: #F3EEE5;
+      --paper-deep: #ECE5D6;
+      --ink: #0F0F14;
+      --ink-soft: #2A2A30;
+      --ink-faint: #8A8580;
+      --rust: #C8390A;
+      --rule-soft: rgba(15, 15, 20, 0.18);
+
+      --font-serif: "IBM Plex Serif", "EB Garamond", Georgia, serif;
+      --font-sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--paper);
+      color: var(--ink-soft);
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-size: 15px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    /* Subtle horizontal baseline pattern on the paper ground. */
+    body {
+      background-image: repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent 23px,
+        rgba(15, 15, 20, 0.022) 23px,
+        rgba(15, 15, 20, 0.022) 24px
+      );
+    }
+
+    a {
+      color: var(--ink);
+      text-decoration: none;
+      border-bottom: 1px solid var(--rule-soft);
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+
+    a:hover {
+      color: var(--rust);
+      border-bottom-color: var(--rust);
+    }
+
+    /* ---------- Page frame ---------- */
+
+    .page {
+      position: relative;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 88px 56px 120px;
+    }
+
+    /* Registration marks — 14×14 outlined squares at each corner of the page. */
+    .reg {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border: 1px solid var(--ink);
+    }
+    .reg.tl { top: 32px; left: 32px; }
+    .reg.tr { top: 32px; right: 32px; }
+    .reg.bl { bottom: 32px; left: 32px; }
+    .reg.br { bottom: 32px; right: 32px; }
+
+    /* ---------- Eyebrow rule ---------- */
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--rust);
+      margin: 0 0 16px;
+    }
+    .eyebrow::before {
+      content: "";
+      display: block;
+      width: 36px;
+      height: 1px;
+      background: var(--rust);
+    }
+
+    /* ---------- Top masthead ---------- */
+
+    .masthead {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: 32px;
+      padding-bottom: 36px;
+      border-bottom: 1px solid var(--ink);
+    }
+
+    .masthead h1 {
+      font-family: var(--font-serif);
+      font-weight: 400;
+      font-size: clamp(56px, 8vw, 92px);
+      line-height: 0.98;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin: 0;
+    }
+
+    .masthead h1 em {
+      font-style: italic;
+      color: var(--rust);
+    }
+
+    .masthead .meta {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      text-align: right;
+      line-height: 1.7;
+    }
+
+    /* Boxed monogram. */
+    .monogram {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      border: 1.5px solid var(--ink);
+      font-family: var(--font-serif);
+      font-size: 20px;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+    }
+    .monogram em {
+      font-style: italic;
+      color: var(--rust);
+      margin-left: 1px;
+    }
+
+    /* ---------- Lede ---------- */
+
+    .lede {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 24px;
+      margin: 56px 0 64px;
+    }
+
+    .lede .gutter {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      padding-top: 10px;
+    }
+
+    .lede p {
+      font-family: var(--font-serif);
+      font-weight: 400;
+      font-size: 21px;
+      line-height: 1.5;
+      color: var(--ink);
+      max-width: 64ch;
+      margin: 0 0 14px;
+    }
+
+    .lede p em {
+      font-style: italic;
+      color: var(--rust);
+    }
+
+    /* ---------- Section heads ---------- */
+
+    section {
+      margin-top: 88px;
+      padding-top: 28px;
+      border-top: 1px solid var(--rule-soft);
+    }
+
+    section:first-of-type {
+      border-top: none;
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 24px;
+      align-items: baseline;
+      margin-bottom: 28px;
+    }
+
+    .section-head .sym {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--rust);
+      padding-top: 14px;
+    }
+
+    .section-head h2 {
+      font-family: var(--font-serif);
+      font-weight: 400;
+      font-size: clamp(34px, 4.4vw, 42px);
+      line-height: 1.08;
+      letter-spacing: -0.014em;
+      color: var(--ink);
+      margin: 0;
+      max-width: 22ch;
+    }
+
+    .section-head h2 em {
+      font-style: italic;
+      color: var(--rust);
+    }
+
+    /* ---------- Body within a section ---------- */
+
+    .section-body {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 24px;
+    }
+
+    .section-body .gutter {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      padding-top: 4px;
+    }
+
+    .section-body .content {
+      max-width: 64ch;
+    }
+
+    .section-body p {
+      font-family: var(--font-serif);
+      font-size: 17px;
+      line-height: 1.7;
+      color: var(--ink-soft);
+      margin: 0 0 18px;
+    }
+
+    .section-body p em {
+      font-style: italic;
+      color: var(--rust);
+    }
+
+    .section-body p strong {
+      font-weight: 500;
+      color: var(--ink);
+    }
+
+    /* ---------- File chips ---------- */
+
+    .file {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--rust);
+      background: none;
+    }
+
+    /* ---------- Lists ---------- */
+
+    .section-body ul {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 18px;
+    }
+
+    .section-body ul li {
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+      padding: 8px 0 8px 18px;
+      border-bottom: 1px solid var(--rule-soft);
+      position: relative;
+    }
+
+    .section-body ul li::before {
+      content: "—";
+      position: absolute;
+      left: 0;
+      top: 8px;
+      color: var(--ink-faint);
+      font-family: var(--font-mono);
+    }
+
+    .section-body ul li:last-child {
+      border-bottom: none;
+    }
+
+    .section-body ul li strong {
+      font-weight: 500;
+      color: var(--ink);
+    }
+
+    /* ---------- Terminal block ---------- */
+
+    .terminal {
+      background: var(--ink);
+      color: #F0ECE5;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.65;
+      padding: 22px 24px 22px 44px;
+      margin: 8px 0 24px;
+      position: relative;
+      white-space: pre;
+      overflow-x: auto;
+    }
+    .terminal::before {
+      content: "$";
+      position: absolute;
+      left: 18px;
+      top: 22px;
+      color: var(--rust);
+      font-weight: 500;
+    }
+
+    .terminal .comment {
+      color: #7A756D;
+    }
+
+    /* ---------- Tables ---------- */
+
+    .table-wrap {
+      background: var(--paper-tint);
+      border: 1px solid var(--rule-soft);
+      padding: 18px 22px;
+      margin: 8px 0 28px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-sans);
+      font-size: 14px;
+    }
+
+    table thead th {
+      text-align: left;
+      font-family: var(--font-mono);
+      font-weight: 400;
+      font-size: 10.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      padding: 0 16px 12px 0;
+      border-bottom: 1px solid var(--ink);
+    }
+
+    table tbody td {
+      padding: 12px 16px 12px 0;
+      vertical-align: top;
+      color: var(--ink-soft);
+      border-bottom: 1px solid var(--rule-soft);
+    }
+
+    table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    table tbody td:first-child {
+      font-family: var(--font-mono);
+      color: var(--ink);
+      font-size: 13.5px;
+    }
+
+    table tbody td code {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: var(--rust);
+    }
+
+    /* ---------- Stamp tag ---------- */
+
+    .stamp {
+      display: inline-block;
+      background: var(--paper-deep);
+      color: var(--ink);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      padding: 6px 10px;
+      margin-right: 6px;
+    }
+
+    .stamp.rust {
+      color: var(--rust);
+    }
+
+    /* ---------- Status grid ---------- */
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 0;
+      border-top: 1px solid var(--ink);
+      border-left: 1px solid var(--rule-soft);
+    }
+    .status-card {
+      border-right: 1px solid var(--rule-soft);
+      border-bottom: 1px solid var(--rule-soft);
+      padding: 22px 22px 26px;
+      background: var(--paper);
+      transition: background 0.15s ease;
+    }
+    .status-card:hover {
+      background: var(--paper-tint);
+    }
+
+    .status-card .label {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .status-card .label::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--rule-soft);
+    }
+
+    .status-card h3 {
+      font-family: var(--font-serif);
+      font-weight: 400;
+      font-size: 19px;
+      line-height: 1.25;
+      color: var(--ink);
+      margin: 0 0 8px;
+    }
+
+    .status-card h3 em {
+      font-style: italic;
+      color: var(--rust);
+    }
+
+    .status-card p {
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: var(--ink-soft);
+      margin: 0;
+    }
+
+    /* ---------- Pull-quote band ---------- */
+
+    .pullquote {
+      margin: 88px 0 0;
+      padding: 56px 0;
+      border-top: 1px solid var(--ink);
+      border-bottom: 1px solid var(--ink);
+      display: grid;
+      grid-template-columns: 160px 1fr 200px;
+      gap: 28px;
+      align-items: center;
+    }
+
+    .pullquote .tag {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--rust);
+    }
+
+    .pullquote q {
+      font-family: var(--font-serif);
+      font-weight: 400;
+      font-size: clamp(28px, 3.4vw, 38px);
+      line-height: 1.22;
+      letter-spacing: -0.014em;
+      color: var(--ink);
+      quotes: none;
+    }
+    .pullquote q::before,
+    .pullquote q::after {
+      content: "";
+    }
+    .pullquote q em {
+      font-style: italic;
+      color: var(--rust);
+    }
+
+    .pullquote .attr {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      line-height: 1.7;
+      text-align: right;
+    }
+
+    /* ---------- Foot ---------- */
+
+    footer {
+      margin-top: 96px;
+      padding-top: 28px;
+      border-top: 1px solid var(--rule-soft);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 32px;
+      align-items: end;
+    }
+
+    footer .signature {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-family: var(--font-serif);
+      font-size: 17px;
+      color: var(--ink);
+    }
+    footer .signature::before {
+      content: "";
+      width: 28px;
+      height: 1px;
+      background: var(--rust);
+      display: block;
+    }
+    footer .signature em {
+      font-style: italic;
+      color: var(--rust);
+    }
+
+    footer .rev {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      text-align: right;
+      line-height: 1.7;
+    }
+
+    /* ---------- Responsive ---------- */
+
+    @media (max-width: 720px) {
+      .page {
+        padding: 64px 24px 96px;
+      }
+      .reg.tl { top: 16px; left: 16px; }
+      .reg.tr { top: 16px; right: 16px; }
+      .reg.bl { bottom: 16px; left: 16px; }
+      .reg.br { bottom: 16px; right: 16px; }
+
+      .masthead {
+        grid-template-columns: 1fr;
+        align-items: start;
+      }
+      .masthead .meta { text-align: left; }
+
+      .lede,
+      .section-head,
+      .section-body {
+        grid-template-columns: 1fr;
+      }
+      .lede .gutter,
+      .section-head .sym,
+      .section-body .gutter {
+        padding-top: 0;
+      }
+
+      .pullquote {
+        grid-template-columns: 1fr;
+      }
+      .pullquote .attr {
+        text-align: left;
+      }
+
+      footer {
+        grid-template-columns: 1fr;
+        align-items: start;
+      }
+      footer .rev {
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <span class="reg tl"></span>
+    <span class="reg tr"></span>
+    <span class="reg bl"></span>
+    <span class="reg br"></span>
+
+    <!-- Masthead -->
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">Repo schematic — Rev. 2026.05</p>
+        <h1>Wake-word <em>endpoint</em>.</h1>
+      </div>
+      <div>
+        <div class="monogram">W<em>M</em></div>
+        <div class="meta">
+          claude/wake-word<br />
+          Mac Studio · Pi 5<br />
+          Milestone 01
+        </div>
+      </div>
+    </header>
+
+    <!-- Lede -->
+    <div class="lede">
+      <div class="gutter">Note · 01</div>
+      <div>
+        <p>
+          Local wake-word detection for a <em>surgical-suite</em>-shaped
+          ambient-listening system. The endpoint listens locally and streams
+          nothing until a wake word fires.
+        </p>
+        <p>
+          Cloud credentials live in the gateway, never on the endpoint.
+        </p>
+      </div>
+    </div>
+
+    <!-- §01 Signal path -->
+    <section>
+      <div class="section-head">
+        <div class="sym">§ 01</div>
+        <h2>Signal <em>path</em>.</h2>
+      </div>
+      <div class="section-body">
+        <div class="gutter">Fig. 1</div>
+        <div class="content">
+          <p>
+            One mic. One trigger. One controlled stream upstream.
+          </p>
+<div class="terminal">USB mic
+  → Mac Studio or Raspberry Pi 5 endpoint
+  → local wake-word detection
+  → post-trigger websocket stream
+  → Azure-hosted gateway
+  → Microsoft transcription
+  → live transcript events</div>
+          <p>
+            The endpoint never sends frames before activation. After the wake
+            word fires, the endpoint opens an authenticated session and
+            forwards <em>only</em> the post-trigger window.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- §02 Repo areas -->
+    <section>
+      <div class="section-head">
+        <div class="sym">§ 02</div>
+        <h2>Repo, <em>end-to-end</em>.</h2>
+      </div>
+      <div class="section-body">
+        <div class="gutter">Source · Tree</div>
+        <div class="content">
+          <ul>
+            <li><span class="file">endpoint/</span> — <strong>Python endpoint</strong> for Mac Studio and Raspberry Pi 5.</li>
+            <li><span class="file">gateway/</span> — <strong>TypeScript gateway</strong> for endpoint streams and Azure transcription.</li>
+            <li><span class="file">eval/</span> — <strong>Live-trial reporting</strong> for observational wake-word comparisons.</li>
+            <li><span class="file">docs/</span> — Architecture, hardware, protocol, and evaluation notes.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- §03 Wake engines -->
+    <section>
+      <div class="section-head">
+        <div class="sym">§ 03</div>
+        <h2>Wake engines, <em>swappable</em>.</h2>
+      </div>
+      <div class="section-body">
+        <div class="gutter">Tab. 1</div>
+        <div class="content">
+          <p>
+            Four interchangeable engines, selected via
+            <span class="file">wake_word.engine</span> in the endpoint config.
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Engine</th>
+                  <th>Install extra</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>fake</td>
+                  <td><code>—</code></td>
+                  <td>Deterministic trigger for smoke tests.</td>
+                </tr>
+                <tr>
+                  <td>openwakeword</td>
+                  <td><code>pip install .[openwakeword]</code></td>
+                  <td>ONNX models — "Hey Jarvis" out of the box.</td>
+                </tr>
+                <tr>
+                  <td>porcupine</td>
+                  <td><code>pip install .[porcupine]</code></td>
+                  <td>Picovoice; access key required.</td>
+                </tr>
+                <tr>
+                  <td>sherpa</td>
+                  <td><code>pip install .[sherpa]</code></td>
+                  <td>Local keyword spotting; custom lists.</td>
+                </tr>
+                <tr>
+                  <td>microsoft</td>
+                  <td><code>pip install .[microsoft-keyword]</code></td>
+                  <td>Azure custom keyword <span class="file">.table</span> models.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- §04 Local gateway smoke -->
+    <section>
+      <div class="section-head">
+        <div class="sym">§ 04</div>
+        <h2>Local <em>smoke</em> test.</h2>
+      </div>
+      <div class="section-body">
+        <div class="gutter">Run · 01</div>
+        <div class="content">
+          <p>
+            <span class="stamp rust">Terminal 1</span> Gateway with mock
+            transcription:
+          </p>
+<div class="terminal">cd gateway
+GATEWAY_DEVICE_TOKEN=dev-token \
+GATEWAY_ALLOWED_ENDPOINT_IDS=mac-studio-01 \
+TRANSCRIPTION_MODE=mock \
+npm run dev</div>
+          <p>
+            <span class="stamp rust">Terminal 2</span> Endpoint with the fake
+            wake engine:
+          </p>
+<div class="terminal">. .venv/bin/activate
+wake-endpoint run-fake endpoint/configs/mac.example.yaml \
+  --token dev-token --run-id local-fake-001</div>
+          <p>
+            Expected: the endpoint prints <span class="file">session.accepted</span>,
+            <span class="file">transcript.final</span>, and
+            <span class="file">session.ended</span>.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- §05 Microphone run -->
+    <section>
+      <div class="section-head">
+        <div class="sym">§ 05</div>
+        <h2>Microphone <em>run</em>.</h2>
+      </div>
+      <div class="section-body">
+        <div class="gutter">Run · 02</div>
+        <div class="content">
+          <p>
+            After the local gateway is running, the real endpoint path uses the
+            microphone and the wake engine selected in config:
+          </p>
+<div class="terminal">. .venv/bin/activate
+export GATEWAY_DEVICE_TOKEN=dev-token
+wake-endpoint run endpoint/configs/mac.example.yaml \
+  --run-id local-mic-001 \
+  --max-listen-seconds 30</div>
+          <p>
+            The example config uses the <span class="file">fake</span> engine
+            against live microphone capture. Swap
+            <span class="file">wake_word.engine</span> to
+            <span class="file">openwakeword</span>,
+            <span class="file">porcupine</span>,
+            <span class="file">sherpa</span>, or
+            <span class="file">microsoft</span> after installing the matching
+            optional dependency. Each detection prints its <em>trigger
+            latency</em>.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- §06 Live trials -->
+    <section>
+      <div class="section-head">
+        <div class="sym">§ 06</div>
+        <h2>Live <em>trials</em>.</h2>
+      </div>
+      <div class="section-body">
+        <div class="gutter">Eval · YAML</div>
+        <div class="content">
+          <p>
+            Observational reports live under
+            <span class="file">eval/live_trials/</span>. The current set covers
+            four runs from May 2026:
+          </p>
+          <ul>
+            <li><strong>OpenWakeWord</strong> — "Hey Jarvis"</li>
+            <li><strong>Sherpa-ONNX</strong> — "Hey Computer"</li>
+            <li><strong>Sherpa-ONNX</strong> — "Wake Up Atlas"</li>
+            <li><strong>Microsoft Azure custom keyword</strong> — "Hey Computer"</li>
+          </ul>
+          <p>
+            Render a summary with
+            <span class="file">wake-eval-report eval/live_trials/&lt;file&gt;.yaml</span>.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pull quote -->
+    <aside class="pullquote">
+      <div class="tag">Principle · 01</div>
+      <q>
+        The endpoint streams <em>nothing</em> until a local wake word fires.
+      </q>
+      <div class="attr">
+        Architecture<br />
+        Rev. 2026.05
+      </div>
+    </aside>
+
+    <!-- §07 Milestone status -->
+    <section>
+      <div class="section-head">
+        <div class="sym">§ 07</div>
+        <h2>Milestone 01 — <em>status</em>.</h2>
+      </div>
+      <div class="section-body">
+        <div class="gutter">Rev · 2026.05</div>
+        <div class="content">
+          <p>
+            <span class="stamp">Verified · 2026.05.16</span>
+            <span class="stamp">Milestone 01</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Status grid -->
+      <div class="status-grid">
+        <div class="status-card">
+          <div class="label">Built · 01</div>
+          <h3>Protocol &amp; <em>controller</em></h3>
+          <p>Endpoint/gateway contract, config, microphone run command, audio source, fake wake engine, gateway client, and controller.</p>
+        </div>
+        <div class="status-card">
+          <div class="label">Built · 02</div>
+          <h3>Gateway <em>service</em></h3>
+          <p>TypeScript websocket server with auth, mock transcription, Azure Speech adapter, Container Apps files, fail-closed tokens, allow-list, retry policy, basic metrics.</p>
+        </div>
+        <div class="status-card">
+          <div class="label">Built · 03</div>
+          <h3>Wake <em>engines</em></h3>
+          <p>OpenWakeWord, Porcupine, Sherpa-ONNX, and Microsoft custom keyword adapters. Detection latency printed per trigger.</p>
+        </div>
+        <div class="status-card">
+          <div class="label">Built · 04</div>
+          <h3>Pi 5 <em>bring-up</em></h3>
+          <p>Raspberry Pi 5 docs and an audio check script. Mic input-overflow tolerated.</p>
+        </div>
+        <div class="status-card">
+          <div class="label">Built · 05</div>
+          <h3>Live-trial <em>reports</em></h3>
+          <p>Observational report format with four recorded runs across OpenWakeWord, Sherpa-ONNX, and Microsoft Azure.</p>
+        </div>
+        <div class="status-card">
+          <div class="label">Not yet · 06</div>
+          <h3>Cloud <em>seam</em></h3>
+          <p>Live Azure Container Apps deployment, live Azure Speech path, and Pi 5 mic capture after a fresh setup all remain unverified.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Foot -->
+    <footer>
+      <div class="signature">
+        Will <em>Macdonald</em>
+      </div>
+      <div class="rev">
+        Rev. 2026.05<br />
+        Chicago, IL
+      </div>
+    </footer>
+  </main>
+</body>
+</html>
