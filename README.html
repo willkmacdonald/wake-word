@@ -784,14 +784,71 @@ wake-endpoint run-fake endpoint/configs/mac.example.yaml \
       </div>
     </section>
 
-    <!-- §05 Microphone run -->
+    <!-- §05 Local Hey Computer demo -->
     <section>
       <div class="section-head">
         <div class="sym">§ 05</div>
-        <h2>Microphone <em>run</em>.</h2>
+        <h2>Hey Computer <em>demo</em>.</h2>
       </div>
       <div class="section-body">
         <div class="gutter">Run · 02</div>
+        <div class="content">
+          <p>
+            This is the Mac Studio demo path used for the successful Phase 1
+            baseline. It runs local wake detection with Microsoft Custom
+            Keyword and uses the local mock gateway, so no Azure transcription
+            cost is incurred during the demo.
+          </p>
+          <p><span class="stamp rust">Prerequisites</span></p>
+          <ul>
+            <li>USB microphone attached to the Mac Studio.</li>
+            <li>Microsoft Custom Keyword model at <span class="file">models/microsoft-custom-keyword/hey-computer.table</span>.</li>
+            <li>Endpoint dependency installed with <span class="file">uv sync --extra microsoft-keyword</span>.</li>
+            <li>Gateway dependencies installed with <span class="file">cd gateway &amp;&amp; npm install</span>.</li>
+          </ul>
+          <p>
+            <span class="stamp rust">Terminal 1</span> From the repo root:
+          </p>
+<div class="terminal">cd gateway
+GATEWAY_DEVICE_TOKEN=dev-token \
+GATEWAY_ALLOWED_ENDPOINT_IDS=mac-studio-01 \
+TRANSCRIPTION_MODE=mock \
+npm run dev</div>
+          <p>
+            <span class="stamp rust">Terminal 2</span> From the repo root:
+          </p>
+<div class="terminal">GATEWAY_DEVICE_TOKEN=dev-token \
+uv run wake-endpoint run endpoint/configs/mac.microsoft-hey-computer.example.yaml \
+  --run-id mac-microsoft-hey-computer-demo-001 \
+  --max-listen-seconds 45 \
+  --microsoft-keyword-table models/microsoft-custom-keyword/hey-computer.table</div>
+          <p><span class="stamp rust">Run procedure</span></p>
+          <ul>
+            <li>Wait about two seconds after pressing enter.</li>
+            <li>Say <span class="file">Hey Computer</span> once.</li>
+            <li>Watch for the <span class="file">wake.detected</span> line. That is the local wake-detection moment.</li>
+            <li>Wait for <span class="file">session.accepted</span>, <span class="file">transcript.final</span>, and <span class="file">session.ended</span>.</li>
+          </ul>
+          <p>
+            Expected: <span class="file">wake.detected</span> appears
+            immediately after the wake phrase. The mock transcript appears
+            later because the current config streams a fixed five second
+            post-trigger clip before finalizing. A visible response around the
+            seven second mark is expected in this mock path and is not
+            wake-detection latency.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- §06 Microphone run -->
+    <section>
+      <div class="section-head">
+        <div class="sym">§ 06</div>
+        <h2>Microphone <em>run</em>.</h2>
+      </div>
+      <div class="section-body">
+        <div class="gutter">Run · 03</div>
         <div class="content">
           <p>
             After the local gateway is running, the real endpoint path uses the
@@ -815,10 +872,10 @@ wake-endpoint run endpoint/configs/mac.example.yaml \
       </div>
     </section>
 
-    <!-- §06 Live trial -->
+    <!-- §07 Live trial -->
     <section>
       <div class="section-head">
-        <div class="sym">§ 06</div>
+        <div class="sym">§ 07</div>
         <h2>Live <em>trial</em>.</h2>
       </div>
       <div class="section-body">
