@@ -16,6 +16,7 @@ USB mic → Mac Studio or Raspberry Pi 5 endpoint → local wake-word detection
 - `gateway/` — TypeScript gateway service for endpoint streams and Azure transcription.
 - `eval/` — live-trial reporting for observational wake-word comparisons.
 - `docs/` — architecture, hardware, protocol, and evaluation notes.
+- `ROADMAP.md` — current project roadmap and phase gates.
 
 ## Wake Engine
 
