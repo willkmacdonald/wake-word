@@ -734,8 +734,8 @@
                   <td>Deterministic trigger for smoke tests.</td>
                 </tr>
                 <tr>
-                  <td>microsoft</td>
-                  <td><code>pip install .[microsoft-keyword]</code></td>
+                  <td>microsoft-custom-keyword</td>
+                  <td><code>uv sync --extra microsoft-keyword</code></td>
                   <td>Azure custom keyword <span class="file">.table</span> models.</td>
                 </tr>
               </tbody>
@@ -803,12 +803,12 @@ wake-endpoint run endpoint/configs/mac.example.yaml \
   --max-listen-seconds 30</div>
           <p>
             The example config uses the <span class="file">fake</span> engine
-            against live microphone capture. Switch
-            <span class="file">wake_word.engine</span> to
-            <span class="file">microsoft</span> after installing
-            <span class="file">pip install .[microsoft-keyword]</span> to run
-            the real Azure custom keyword engine. Each detection prints its
-            <em>trigger latency</em>.
+            against live microphone capture. Use
+            <span class="file">endpoint/configs/mac.microsoft-hey-computer.example.yaml</span>
+            with
+            <span class="file">--microsoft-keyword-table models/microsoft-custom-keyword/hey-computer.table</span>
+            to run the current Azure custom keyword baseline. Each detection
+            prints a <span class="file">wake.detected</span> line immediately.
           </p>
         </div>
       </div>
@@ -832,7 +832,7 @@ wake-endpoint run endpoint/configs/mac.example.yaml \
           </ul>
           <p>
             Render the summary with
-            <span class="file">wake-eval-report eval/live_trials/&lt;file&gt;.yaml</span>.
+            <span class="file">wake-eval-report summarize eval/live_trials/&lt;file&gt;.yaml</span>.
           </p>
         </div>
       </div>
