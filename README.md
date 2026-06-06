@@ -24,8 +24,8 @@ A `fake` engine is also wired up for deterministic smoke tests.
 
 | Engine      | Install extra                       | Notes                                  |
 |-------------|-------------------------------------|----------------------------------------|
-| `fake`      | none                                | Deterministic trigger for smoke tests  |
-| `microsoft` | `pip install .[microsoft-keyword]`  | Azure custom keyword `.table` models   |
+| `fake`                       | none                               | Deterministic trigger for smoke tests  |
+| `microsoft-custom-keyword`   | `uv sync --extra microsoft-keyword` | Azure custom keyword `.table` models   |
 
 Set `wake_word.engine` in the endpoint config to choose between them.
 
@@ -71,9 +71,10 @@ wake-endpoint run endpoint/configs/mac.example.yaml \
 ```
 
 The example config uses the `fake` engine against live microphone capture.
-Switch `wake_word.engine` to `microsoft` after installing
-`pip install .[microsoft-keyword]` to run the real Azure custom keyword
-engine. Each detection prints its trigger latency.
+Use `endpoint/configs/mac.microsoft-hey-computer.example.yaml` with
+`--microsoft-keyword-table models/microsoft-custom-keyword/hey-computer.table`
+to run the current Azure custom keyword baseline. Each detection prints a
+`wake.detected` line immediately.
 
 ## Live Wake-Word Trial
 
@@ -81,7 +82,7 @@ The active wake-word trial lives under `eval/live_trials/`:
 
 - Microsoft Azure custom keyword — "Hey Computer"
 
-Render the summary with `wake-eval-report eval/live_trials/<file>.yaml`.
+Render the summary with `wake-eval-report summarize eval/live_trials/<file>.yaml`.
 
 ## Milestone 1 Status
 
